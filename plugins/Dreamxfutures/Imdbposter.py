@@ -200,18 +200,22 @@ async def _search_media_id(query: str, api_key=None):
 
 
 def _process_images(images_data):
-    """Organize poster and backdrop images by language."""
-    posters_by_lang, backdrops_by_lang = {}, {}
+    """Organize poster, backdrop, and logo images by language."""
+    posters_by_lang, backdrops_by_lang, logos_by_lang = {}, {}, {}
     for img in images_data.get('posters', []):
         lang = img.get('iso_639_1') or 'no_lang'
         posters_by_lang.setdefault(lang, []).append(f"{TMDB_IMAGE_BASE_URL}{img['file_path']}")
     for img in images_data.get('backdrops', []):
         lang = img.get('iso_639_1') or 'no_lang'
         backdrops_by_lang.setdefault(lang, []).append(f"{TMDB_IMAGE_BASE_URL}{img['file_path']}")
+    for img in images_data.get('logos', []):
+        lang = img.get('iso_639_1') or 'no_lang'
+        logos_by_lang.setdefault(lang, []).append(f"{TMDB_IMAGE_BASE_URL}{img['file_path']}")
     posters_by_lang['all'] = [f"{TMDB_IMAGE_BASE_URL}{i['file_path']}" for i in images_data.get('posters', [])]
     backdrops_by_lang['all'] = [f"{TMDB_IMAGE_BASE_URL}{i['file_path']}" for i in images_data.get('backdrops', [])]
-    languages = sorted(set(posters_by_lang) | set(backdrops_by_lang))
-    return {'posters': posters_by_lang, 'backdrops': backdrops_by_lang, 'available_languages': languages}
+    logos_by_lang['all'] = [f"{TMDB_IMAGE_BASE_URL}{i['file_path']}" for i in images_data.get('logos', [])]
+    languages = sorted(set(posters_by_lang) | set(backdrops_by_lang) | set(logos_by_lang))
+    return {'posters': posters_by_lang, 'backdrops': backdrops_by_lang, 'logos': logos_by_lang, 'available_languages': languages}
 
 
 async def _fetch_tmdb_data(query: str, api_key=None):
@@ -441,6 +445,14 @@ async def get_movie_detailsx(query, id=False, file=None):
             backdrop_url = backdrops[key][0]
             break
     details['backdrop_url'] = backdrop_url.replace("/original/", "/w1280/") if backdrop_url else None
+
+    logos = data.get('images', {}).get('logos', {})
+    logo_url = None
+    for key in ('en', original_language, 'xx', 'no_lang', 'all'):
+        if key and logos.get(key):
+            logo_url = logos[key][0]
+            break
+    details['logo_url'] = logo_url
 
     return details
 

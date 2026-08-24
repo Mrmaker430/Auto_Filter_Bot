@@ -6,6 +6,7 @@ from io import BytesIO
 import aiohttp
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from info import UPDATE_CHNL_LNK
+from plugins.Dreamxfutures.fotnt_string import Fonts
 
 logger = logging.getLogger(__name__)
 
@@ -98,15 +99,16 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         # 1. Fetch images asynchronously
         poster_url = details.get("poster_url")
         backdrop_url = details.get("backdrop_url") or poster_url
+        logo_url = details.get("logo_url")
 
-        poster_img, backdrop_img = await asyncio.gather(
+        poster_img, backdrop_img, logo_img = await asyncio.gather(
             _download_image(poster_url),
-            _download_image(backdrop_url)
+            _download_image(backdrop_url),
+            _download_image(logo_url)
         )
 
-        # 2. Draw Backdrop with Red/Black Gradient
+        # 2. Draw Backdrop with Soft Red/Black Gradient (making background image more obvious)
         if backdrop_img:
-            # Scale backdrop to fit right side/fill canvas
             bg_aspect = backdrop_img.width / backdrop_img.height
             target_h = height
             target_w = int(height * bg_aspect)
@@ -118,23 +120,18 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
             bg_crop = resized_bg.crop((target_w - width, 0, target_w, height))
             canvas.paste(bg_crop, (0, 0))
 
-        # Gradient overlay layer (dark red/black left gradient)
+        # Softer overlay gradient layer so backdrop is vibrant & obvious while keeping text legible
         gradient = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         draw_grad = ImageDraw.Draw(gradient)
 
-        # Left red-black shadow gradient
         for x in range(width):
-            if x < 450:
-                alpha = 255
-                r = int(10 + (25 - 10) * (x / 450))
-                g = 1
-                b = 2
-            elif x < 900:
-                factor = (x - 450) / 450
-                alpha = int(255 * (1 - factor ** 0.7))
-                r = int(25 * (1 - factor))
-                g = 1
-                b = 2
+            if x < 400:
+                alpha = 180
+                r, g, b = 10, 1, 2
+            elif x < 800:
+                factor = (x - 400) / 400
+                alpha = int(180 * (1 - factor ** 0.8))
+                r, g, b = 10, 1, 2
             else:
                 alpha = 0
                 r, g, b = 0, 0, 0
@@ -170,49 +167,61 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
             width=border_width
         )
 
-        # 4. Left Side Text Elements
+        # 4. Left Side Text / Title Logo Elements
         title_text = str(details.get("title") or "Movie Update").upper().strip()
 
         # Font definitions
-        font_title_lg = _get_font(SERIF_BOLD_FONT_PATH, 72)
-        font_title_watermark = _get_font(SERIF_BOLD_FONT_PATH, 86)
         font_rating_star = _get_font(SANS_BOLD_FONT_PATH, 24)
         font_rating_num = _get_font(SANS_BOLD_FONT_PATH, 24)
         font_badge_imdb = _get_font(SANS_BOLD_FONT_PATH, 16)
         font_badge_info = _get_font(SANS_BOLD_FONT_PATH, 16)
         font_badge_cat = _get_font(SANS_BOLD_FONT_PATH, 15)
-        font_plot = _get_font(SANS_FONT_PATH, 20)
+        font_plot = _get_font(SANS_BOLD_FONT_PATH, 20) # Bold description font
         font_channel = _get_font(SANS_BOLD_FONT_PATH, 22)
 
-        # Title formatting (Match reference: e.g. "THE" on top line if title starts with "THE ")
-        title_lines = []
-        words = title_text.split()
-        if len(words) > 1 and words[0].upper() in ("THE", "A", "AN"):
-            title_lines = [words[0], " ".join(words[1:])]
-        elif len(words) > 2:
-            mid = len(words) // 2
-            title_lines = [" ".join(words[:mid]), " ".join(words[mid:])]
+        curr_y = 75
+
+        if logo_img:
+            # Fit title logo image in top-left region (max w: 560px, max h: 170px)
+            max_logo_w, max_logo_h = 560, 170
+            logo_w, logo_h = logo_img.size
+            ratio = min(max_logo_w / logo_w, max_logo_h / logo_h)
+            new_logo_w = max(1, int(logo_w * ratio))
+            new_logo_h = max(1, int(logo_h * ratio))
+
+            logo_resized = logo_img.resize((new_logo_w, new_logo_h), Image.LANCZOS)
+            logo_x = int(360 - new_logo_w / 2)
+            logo_y = int(125 - new_logo_h / 2)
+
+            canvas.paste(logo_resized, (logo_x, logo_y), logo_resized)
+            draw = ImageDraw.Draw(canvas)
+            curr_y = max(logo_y + new_logo_h + 15, 220)
         else:
-            title_lines = [title_text]
+            # Fallback: draw title logo text using styled serief logo font
+            styled_title = Fonts.serief(title_text)
 
-        # Calculate title height and font sizes
-        title_start_y = 75
-
-        # Draw Watermark Title behind
-        watermark_text = title_text
-        font_wm = _get_font(SERIF_BOLD_FONT_PATH, 80)
-        draw.text((360, 240), watermark_text, font=font_wm, fill=(15, 0, 2, 210), anchor="mm")
-
-        # Draw Title Lines
-        curr_y = title_start_y
-        for idx, tline in enumerate(title_lines):
-            # If line 1 is "THE", make it slightly smaller serif, line 2 larger
-            if len(title_lines) > 1 and idx == 0 and len(tline) <= 4:
-                font_tl = _get_font(SERIF_BOLD_FONT_PATH, 52)
+            title_lines = []
+            words = styled_title.split()
+            if len(words) > 1 and words[0].upper() in ("𝐓𝐇𝐄", "𝐀", "𝐀𝐍"):
+                title_lines = [words[0], " ".join(words[1:])]
+            elif len(words) > 2:
+                mid = len(words) // 2
+                title_lines = [" ".join(words[:mid]), " ".join(words[mid:])]
             else:
-                font_tl = _get_font(SERIF_BOLD_FONT_PATH, 76 if len(tline) <= 8 else 60)
-            draw.text((360, curr_y), tline, font=font_tl, fill=(255, 255, 255, 255), anchor="mm")
-            curr_y += 70 if idx == 0 and len(title_lines) > 1 else 80
+                title_lines = [styled_title]
+
+            # Draw Watermark Title behind
+            font_wm = _get_font(SERIF_BOLD_FONT_PATH, 80)
+            draw.text((360, 240), title_text, font=font_wm, fill=(15, 0, 2, 210), anchor="mm")
+
+            curr_y = 75
+            for idx, tline in enumerate(title_lines):
+                if len(title_lines) > 1 and idx == 0 and len(tline) <= 4:
+                    font_tl = _get_font(SERIF_BOLD_FONT_PATH, 52)
+                else:
+                    font_tl = _get_font(SERIF_BOLD_FONT_PATH, 76 if len(tline) <= 8 else 60)
+                draw.text((360, curr_y), tline, font=font_tl, fill=(255, 255, 255, 255), anchor="mm")
+                curr_y += 70 if idx == 0 and len(title_lines) > 1 else 80
 
         # 5. Rating & Badges Row (y ≈ 265)
         row_y = max(curr_y + 10, 260)
@@ -266,13 +275,13 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
             draw.text((curr_badge_x + g_w // 2, badge_y + 16), g_text, font=font_badge_cat, fill=(235, 30, 110, 255), anchor="mm")
             curr_badge_x += g_w + 14
 
-        # 7. Plot Overview Text (y ≈ 395)
+        # 7. Plot Overview Text (bold description text)
         plot_text = str(details.get("plot") or "").strip()
         if plot_text and plot_text != "N/A":
             plot_y = badge_y + 52
             wrapped_lines = _wrap_text(plot_text, font_plot, max_width=620, max_lines=4)
             for line in wrapped_lines:
-                draw.text((start_x, plot_y), line, font=font_plot, fill=(220, 220, 220, 255))
+                draw.text((start_x, plot_y), line, font=font_plot, fill=(255, 255, 255, 255))
                 plot_y += 28
 
         # 8. Bottom Telegram Channel Pill Badge
