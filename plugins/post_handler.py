@@ -250,7 +250,7 @@ async def update_post_preview(client: Client, session_id: int, chat_id: int, for
                 await client.edit_message_caption(chat_id, session["last_preview_message_id"], caption=final_caption, reply_markup=keyboard)
         else:
             text_content = f"<a href='{poster_to_use}'>&#8205;</a>{final_caption}" if poster_to_use else final_caption
-            await client.edit_message_text(chat_id, session["last_preview_message_id"], text_content, reply_markup=keyboard, disable_web_page_preview=False, invert_media=ABOVE_PREVIEW)
+            await client.edit_message_text(chat_id, session["last_preview_message_id"], text_content, reply_markup=keyboard, disable_web_page_preview=False)
     except MessageNotModified:
         pass
     except Exception as e:
