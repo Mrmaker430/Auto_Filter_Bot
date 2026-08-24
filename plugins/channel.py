@@ -376,7 +376,8 @@ async def send_movie_update(bot, base_name):
             buttons = InlineKeyboardMarkup([[
                 InlineKeyboardButton(
                     '🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎',
-                    url=GRP_LNK
+                    url=GRP_LNK,
+                    style=enums.ButtonStyle.SUCCESS
                 )
             ]])
             size=(2560, 1440) if LANDSCAPE_POSTER and TMDB_POSTER and movie_doc.get("is_backdrop") and not movie_doc.get("error_tmdb") else (853, 1280)
@@ -448,7 +449,8 @@ async def update_movie_message(bot, base_name):
         buttons = InlineKeyboardMarkup([[
             InlineKeyboardButton(
                 '🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎',
-                url=GRP_LNK
+                url=GRP_LNK,
+                style=enums.ButtonStyle.SUCCESS
             )
         ]])
 
