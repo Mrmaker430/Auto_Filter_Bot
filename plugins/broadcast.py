@@ -8,10 +8,12 @@ from pyrogram.errors.exceptions.bad_request_400 import MessageTooLong
 from database.users_chats_db import db
 from info import ADMINS
 from utils import users_broadcast, groups_broadcast, temp, get_readable_time, clear_junk, junk_group
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 logger = logging.getLogger(__name__)
 lock = asyncio.Lock()
+
+PENDING_BROADCASTS = {}
 
 @Client.on_callback_query(filters.regex(r'^broadcast_cancel'))
 async def broadcast_cancel(bot, query):
@@ -26,27 +28,78 @@ async def broadcast_cancel(bot, query):
 @Client.on_message(filters.command("broadcast") & filters.user(ADMINS) & filters.private)
 async def broadcast_users(bot, message):
     if not message.reply_to_message:
-        return await message.reply("<b>Reply to a message to broadcast.</b>",parse_mode=enums.ParseMode.HTML)
+        return await message.reply("<b>Reply to a message to broadcast.</b>", parse_mode=enums.ParseMode.HTML)
     if lock.locked():
         return await message.reply("⚠️ Another broadcast is in progress. Please wait...")
-    ask = await message.reply(
-        "<b>Do you want to pin this message in users?</b>",
-        reply_markup=ReplyKeyboardMarkup([["Yes", "No"]], one_time_keyboard=True, resize_keyboard=True)
-    )
-    try:
-        dreamxbotz_user_response = await bot.listen(chat_id=message.chat.id, user_id=message.from_user.id, timeout=60)
-    except asyncio.TimeoutError:
-        await ask.delete()
-        return await message.reply("❌ Timed out. Broadcast cancelled.")
-    await ask.delete()
-    if dreamxbotz_user_response.text not in ("Yes", "No"):
-        return await message.reply("❌ Invalid input. Broadcast cancelled.")
 
-    is_pin = dreamxbotz_user_response.text == "Yes"
-    b_msg = message.reply_to_message
+    PENDING_BROADCASTS[f"{message.from_user.id}_users"] = message.reply_to_message
+    btn = [
+        [
+            InlineKeyboardButton("📌 Yes, Pin", callback_data="broadcast_pin#yes#users"),
+            InlineKeyboardButton("📌 No, Don't Pin", callback_data="broadcast_pin#no#users")
+        ]
+    ]
+    await message.reply(
+        "<b>Do you want to pin this message in users?</b>",
+        reply_markup=InlineKeyboardMarkup(btn),
+        parse_mode=enums.ParseMode.HTML
+    )
+
+@Client.on_message(filters.command("grp_broadcast") & filters.user(ADMINS) & filters.private)
+async def broadcast_group(bot, message):
+    if not message.reply_to_message:
+        return await message.reply("<b>Reply to a message to group broadcast.</b>", parse_mode=enums.ParseMode.HTML)
+    if lock.locked():
+        return await message.reply("⚠️ Another broadcast is in progress. Please wait...")
+
+    PENDING_BROADCASTS[f"{message.from_user.id}_groups"] = message.reply_to_message
+    btn = [
+        [
+            InlineKeyboardButton("📌 Yes, Pin", callback_data="broadcast_pin#yes#groups"),
+            InlineKeyboardButton("📌 No, Don't Pin", callback_data="broadcast_pin#no#groups")
+        ]
+    ]
+    await message.reply(
+        "<b>Do you want to pin this message in groups?</b>",
+        reply_markup=InlineKeyboardMarkup(btn),
+        parse_mode=enums.ParseMode.HTML
+    )
+
+@Client.on_callback_query(filters.regex(r'^broadcast_pin#') & filters.user(ADMINS))
+async def broadcast_pin_handler(bot, query):
+    _, option, target = query.data.split("#")
+    user_id = query.from_user.id
+    key = f"{user_id}_{target}"
+
+    b_msg = PENDING_BROADCASTS.pop(key, None)
+    if not b_msg:
+        await query.answer("❌ Broadcast session expired or invalid.", show_alert=True)
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        return
+
+    if lock.locked():
+        await query.answer("⚠️ Another broadcast is in progress. Please wait...", show_alert=True)
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        return
+
+    is_pin = (option == "yes")
+    await query.message.delete()
+
+    if target == "users":
+        await start_users_broadcast(bot, query.message, b_msg, is_pin)
+    elif target == "groups":
+        await start_groups_broadcast(bot, query.message, b_msg, is_pin)
+
+async def start_users_broadcast(bot, message, b_msg, is_pin):
     users = [user async for user in await db.get_all_users()]
     total_users = len(users)
-    dreamxbotz_status_msg = await message.reply_text("📤 <b>Broadcasting your message...</b>")
+    dreamxbotz_status_msg = await bot.send_message(message.chat.id, "📤 <b>Broadcasting your message...</b>")
     success = blocked = deleted = failed = 0
     start_time = time.time()
     cancelled = False
@@ -105,29 +158,10 @@ async def broadcast_users(bot, message):
     )
     await dreamxbotz_status_msg.edit(final_status)
 
-
-@Client.on_message(filters.command("grp_broadcast") & filters.user(ADMINS) & filters.private)
-async def broadcast_group(bot, message):
-    if not message.reply_to_message:
-        return await message.reply("<b>Reply to a message to group broadcast.</b>", parse_mode=enums.ParseMode.HTML)
-    ask = await message.reply(
-        "<b>Do you want to pin this message in groups?</b>",
-        reply_markup=ReplyKeyboardMarkup([["Yes", "No"]], one_time_keyboard=True, resize_keyboard=True)
-    )
-    try:
-        dreamxbotz_user_response = await bot.listen(chat_id=message.chat.id, user_id=message.from_user.id, timeout=60)
-    except asyncio.TimeoutError:
-        await ask.delete()
-        return await message.reply("❌ Timed out. Broadcast cancelled.")
-    await ask.delete()
-    if dreamxbotz_user_response.text not in ("Yes", "No"):
-        return await message.reply("❌ Invalid input. Broadcast cancelled.")
-
-    is_pin = dreamxbotz_user_response.text == "Yes"
-    b_msg = message.reply_to_message
+async def start_groups_broadcast(bot, message, b_msg, is_pin):
     chats = await db.get_all_chats()
     total_chats = await db.total_chat_count()
-    dreamxbotz_status_msg = await message.reply_text("📤 <b>Broadcasting your message to groups...</b>")
+    dreamxbotz_status_msg = await bot.send_message(message.chat.id, "📤 <b>Broadcasting your message to groups...</b>")
     start_time = time.time()
     done = success = failed = 0
     cancelled = False
@@ -160,7 +194,7 @@ async def broadcast_group(bot, message):
                     reply_markup=InlineKeyboardMarkup(btn)
                 )
     time_taken = get_readable_time(time.time() - start_time)
-    dreamxbotz_text = (
+    dreamxtext = (
         f"{'❌ <b>Groups broadcast cancelled!</b>' if cancelled else '✅ <b>Group broadcast completed.</b>'}\n"
         f"⏱️ Completed in {time_taken}\n\n"
         f"👥 Total Groups: <code>{total_chats}</code>\n"
@@ -169,12 +203,12 @@ async def broadcast_group(bot, message):
         f"❌ Failed: <code>{failed}</code>"
     )
     try:
-        await dreamxbotz_status_msg.edit(dreamxbotz_text)
+        await dreamxbotz_status_msg.edit(dreamxtext)
     except MessageTooLong:
         with open("reason.txt", "w+") as outfile:
             outfile.write(str(failed))
-        await message.reply_document(
-            "reason.txt", caption=dreamxbotz_text
+        await bot.send_document(
+            message.chat.id, "reason.txt", caption=dreamxtext
         )
         os.remove("reason.txt")
 
@@ -193,7 +227,7 @@ async def remove_junkuser__db(bot, message):
         pti, sh = await clear_junk(int(user['id']), b_msg)
         if not pti:
             if sh == "Blocked":
-                blocked+=1
+                blocked += 1
             elif sh == "Deleted":
                 deleted += 1
             elif sh == "Error":
@@ -224,7 +258,7 @@ async def junk_clear_group(bot, message):
         pti, sh, ex = await junk_group(int(group['id']), b_msg)        
         if not pti:
             if sh == "deleted":
-                deleted+=1 
+                deleted += 1
                 failed += ex 
                 try:
                     await bot.leave_chat(int(group['id']))
@@ -240,5 +274,5 @@ async def junk_clear_group(bot, message):
     except MessageTooLong:
         with open('junk.txt', 'w+') as outfile:
             outfile.write(failed)
-        await message.reply_document('junk.txt', caption=f"Completed:\nCompleted in {time_taken} seconds.\n\nTotal Groups {total_groups}\nCompleted: {done} / {total_groups}\nDeleted: {deleted}")
+        await bot.send_document(message.chat.id, 'junk.txt', caption=f"Completed:\nCompleted in {time_taken} seconds.\n\nTotal Groups {total_groups}\nCompleted: {done} / {total_groups}\nDeleted: {deleted}")
         os.remove("junk.txt")
