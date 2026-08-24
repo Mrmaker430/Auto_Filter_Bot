@@ -475,7 +475,6 @@ async def update_movie_message(bot, base_name):
                     text=text,
                     reply_markup=buttons,
                     parse_mode=enums.ParseMode.HTML,
-                    invert_media=ABOVE_PREVIEW,
                     disable_web_page_preview=not LINK_PREVIEW
                 )
             return
