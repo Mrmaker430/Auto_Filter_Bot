@@ -167,6 +167,8 @@ BUTTON_MODE = is_enabled((environ.get('BUTTON_MODE', "False")), False) # pm & Gr
 STREAM_MODE = is_enabled(environ.get('STREAM_MODE', "True"), True) # Set Stream mode True or False
 PREMIUM_STREAM_MODE = is_enabled(environ.get('PREMIUM_STREAM_MODE', "False"), False) # Set Stream mode True or False only for premium users
 MAINTENANCE = is_enabled(environ.get('MAINTENANCE', "False"), False)
+IS_FILE_LIMIT = is_enabled(environ.get('IS_FILE_LIMIT', "True"), True) # Set File Limit True or False
+FILES_LIMIT = int(environ.get("FILES_LIMIT", "5")) # Max files normal user can fetch per day
 
 
 # ============================
@@ -262,6 +264,7 @@ Bot_cmds = {
     "trial_reset": "User Trial Reset",
     "remove_fsub": "Remove Forced Subscription (group admin only)",
     "maintenance": "Maintenance Mode (Admin Only)",
+    "file_limit": "ᴏɴ ᴏғғ ᴏʀ ꜱᴇᴛ ᴅᴀɪʟʏ ꜰɪʟᴇ ʟɪᴍɪᴛ",
 }
 
 
@@ -279,3 +282,4 @@ LOG_STR += ("BUTTON_MODE is found, filename and file size will be shown in a sin
 LOG_STR += (f"CUSTOM_FILE_CAPTION enabled with value {CUSTOM_FILE_CAPTION}, your files will be sent along with this customized caption.\n" if CUSTOM_FILE_CAPTION else "No CUSTOM_FILE_CAPTION Found, Default captions of file will be used.\n")
 LOG_STR += ("Long IMDB storyline enabled." if LONG_IMDB_DESCRIPTION else "LONG_IMDB_DESCRIPTION is disabled, Plot will be shorter.\n")
 LOG_STR += ("Spell Check Mode is enabled, bot will be suggesting related movies if movie name is misspelled.\n" if SPELL_CHECK_REPLY else "Spell Check Mode is disabled.\n")
+LOG_STR += (f"File quota enabled: Normal users limited to {FILES_LIMIT} files per day.\n" if IS_FILE_LIMIT else "File quota is disabled.\n")
