@@ -169,6 +169,7 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
 
         # 4. Left Side Text / Title Logo Elements
         title_text = str(details.get("title") or "Movie Update").upper().strip()
+        start_x = 75
 
         # Font definitions
         font_rating_star = _get_font(SANS_BOLD_FONT_PATH, 24)
@@ -179,25 +180,25 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         font_plot = _get_font(SANS_BOLD_FONT_PATH, 20) # Bold description font
         font_channel = _get_font(SANS_BOLD_FONT_PATH, 22)
 
-        curr_y = 75
+        curr_y = 65
 
         if logo_img:
-            # Fit title logo image in top-left region (max w: 560px, max h: 170px)
-            max_logo_w, max_logo_h = 560, 170
+            # Fit title logo image in left region (max w: 680px, max h: 160px), left-aligned at start_x
+            max_logo_w, max_logo_h = 680, 160
             logo_w, logo_h = logo_img.size
             ratio = min(max_logo_w / logo_w, max_logo_h / logo_h)
             new_logo_w = max(1, int(logo_w * ratio))
             new_logo_h = max(1, int(logo_h * ratio))
 
             logo_resized = logo_img.resize((new_logo_w, new_logo_h), Image.LANCZOS)
-            logo_x = int(360 - new_logo_w / 2)
-            logo_y = int(125 - new_logo_h / 2)
+            logo_x = start_x
+            logo_y = curr_y
 
             canvas.paste(logo_resized, (logo_x, logo_y), logo_resized)
             draw = ImageDraw.Draw(canvas)
-            curr_y = max(logo_y + new_logo_h + 15, 220)
+            curr_y = logo_y + new_logo_h + 20
         else:
-            # Fallback: draw title logo text using styled serief logo font
+            # Fallback: draw title logo text using styled serief logo font left-aligned at start_x
             styled_title = Fonts.serief(title_text)
 
             title_lines = []
@@ -210,22 +211,20 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
             else:
                 title_lines = [styled_title]
 
-            # Draw Watermark Title behind
-            font_wm = _get_font(SERIF_BOLD_FONT_PATH, 80)
-            draw.text((360, 240), title_text, font=font_wm, fill=(15, 0, 2, 210), anchor="mm")
-
-            curr_y = 75
             for idx, tline in enumerate(title_lines):
                 if len(title_lines) > 1 and idx == 0 and len(tline) <= 4:
                     font_tl = _get_font(SERIF_BOLD_FONT_PATH, 52)
                 else:
-                    font_tl = _get_font(SERIF_BOLD_FONT_PATH, 76 if len(tline) <= 8 else 60)
-                draw.text((360, curr_y), tline, font=font_tl, fill=(255, 255, 255, 255), anchor="mm")
-                curr_y += 70 if idx == 0 and len(title_lines) > 1 else 80
+                    font_tl = _get_font(SERIF_BOLD_FONT_PATH, 72 if len(tline) <= 8 else 56)
+                draw.text((start_x, curr_y), tline, font=font_tl, fill=(255, 255, 255, 255), anchor="lt")
+                bbox = font_tl.getbbox(tline)
+                line_h = bbox[3] - bbox[1]
+                curr_y += max(line_h + 10, 65)
 
-        # 5. Rating & Badges Row (y ≈ 265)
-        row_y = max(curr_y + 10, 260)
-        start_x = 75
+            curr_y += 10
+
+        # 5. Rating & Badges Row
+        row_y = curr_y
 
         # Star ★ 5.7
         rating_val = str(details.get("rating") or "N/A")
@@ -248,7 +247,7 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         line_y = row_y + 38
         draw.line([(start_x, line_y), (start_x + 220, line_y)], fill=(235, 30, 110, 255), width=3)
 
-        # 6. Category & Genre Badges Row (y ≈ 330)
+        # 6. Category & Genre Badges Row
         badge_y = line_y + 22
         curr_badge_x = start_x
 
@@ -276,24 +275,27 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
             curr_badge_x += g_w + 14
 
         # 7. Plot Overview Text (bold description text)
+        plot_y = badge_y + 52
         plot_text = str(details.get("plot") or "").strip()
         if plot_text and plot_text != "N/A":
-            plot_y = badge_y + 52
-            wrapped_lines = _wrap_text(plot_text, font_plot, max_width=620, max_lines=4)
+            wrapped_lines = _wrap_text(plot_text, font_plot, max_width=680, max_lines=4)
             for line in wrapped_lines:
                 draw.text((start_x, plot_y), line, font=font_plot, fill=(255, 255, 255, 255))
                 plot_y += 28
 
-        # 8. Bottom Telegram Channel Pill Badge
+        # 8. Bottom Telegram Channel Pill Badge (placed under description, left-aligned at start_x in a straight line)
         ch_handle = channel_username
         if not ch_handle.startswith("@"):
             ch_handle = "@" + ch_handle.lstrip("@")
 
-        pill_w, pill_h = 250, 52
-        pill_x = 295
-        pill_y = 600
+        handle_bbox = font_channel.getbbox(ch_handle)
+        handle_w = handle_bbox[2] - handle_bbox[0]
+        pill_w = max(240, handle_w + 70)
+        pill_h = 52
+        pill_x = start_x
+        pill_y = max(plot_y + 20, 600)
 
-        # Semi-transparent dark pill background
+        # Semi-transparent dark pill background matching reference image
         pill_overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         pill_draw = ImageDraw.Draw(pill_overlay)
         pill_draw.rounded_rectangle(
@@ -320,7 +322,7 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
 
         canvas = Image.alpha_composite(canvas, pill_overlay)
         draw = ImageDraw.Draw(canvas)
-        draw.text((pill_x + 142, pill_y + 26), ch_handle, font=font_channel, fill=(255, 255, 255, 255), anchor="mm")
+        draw.text((pill_x + 55, pill_y + 26), ch_handle, font=font_channel, fill=(255, 255, 255, 255), anchor="lm")
 
         # Convert to BytesIO buffer
         output_buffer = BytesIO()
