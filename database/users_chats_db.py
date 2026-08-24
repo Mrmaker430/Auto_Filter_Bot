@@ -8,7 +8,7 @@ from info import (
     AUTO_DELETE, AUTO_FFILTER, MAX_BTN, IMDB_TEMPLATE, LOG_VR_CHANNEL, TUTORIAL, TUTORIAL_2,
     TUTORIAL_3, SHORTENER_API, SHORTENER_API2, SHORTENER_API3, SHORTENER_WEBSITE, SHORTENER_WEBSITE2,
     SHORTENER_WEBSITE3, IS_VERIFY, TWO_VERIFY_GAP, THREE_VERIFY_GAP, CUSTOM_FILE_CAPTION, AUTH_CHANNELS,
-    MOVIE_UPDATE_NOTIFICATION
+    MOVIE_UPDATE_NOTIFICATION, IS_FILE_LIMIT, FILES_LIMIT
 )
 
 
@@ -447,6 +447,46 @@ class Database:
 
     async def update_maintenance_status(self, bot_id, enable):
         await self.update_bot_setting(bot_id, 'MAINTENANCE', enable)
+
+    async def file_limit_status(self, bot_id):
+        return await self.get_bot_setting(bot_id, 'IS_FILE_LIMIT', IS_FILE_LIMIT)
+
+    async def update_file_limit_status(self, bot_id, enable):
+        await self.update_bot_setting(bot_id, 'IS_FILE_LIMIT', enable)
+
+    async def get_files_limit(self, bot_id):
+        return await self.get_bot_setting(bot_id, 'FILES_LIMIT', FILES_LIMIT)
+
+    async def update_files_limit(self, bot_id, limit):
+        await self.update_bot_setting(bot_id, 'FILES_LIMIT', limit)
+
+    async def get_user_file_count(self, user_id: int):
+        ist_timezone = pytz.timezone('Asia/Kolkata')
+        today_str = datetime.datetime.now(tz=ist_timezone).strftime('%Y-%m-%d')
+        user = await self.col.find_one({'id': int(user_id)})
+        if not user or 'file_quota' not in user:
+            return 0
+        quota = user.get('file_quota', {})
+        if quota.get('date') != today_str:
+            return 0
+        return quota.get('count', 0)
+
+    async def increment_user_file_count(self, user_id: int):
+        ist_timezone = pytz.timezone('Asia/Kolkata')
+        today_str = datetime.datetime.now(tz=ist_timezone).strftime('%Y-%m-%d')
+        user = await self.col.find_one({'id': int(user_id)})
+        if not user:
+            await self.add_user(user_id, "User")
+            user = await self.col.find_one({'id': int(user_id)})
+
+        quota = user.get('file_quota', {}) if user else {}
+        if quota.get('date') != today_str:
+            new_count = 1
+            await self.col.update_one({'id': int(user_id)}, {'$set': {'file_quota': {'date': today_str, 'count': 1}}})
+        else:
+            new_count = quota.get('count', 0) + 1
+            await self.col.update_one({'id': int(user_id)}, {'$set': {'file_quota.count': new_count}})
+        return new_count
      
 db = Database(DATABASE_URI, DATABASE_NAME)    
 if MULTIPLE_DB and DATABASE_URI2:

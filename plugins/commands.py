@@ -290,6 +290,10 @@ async def start(client, message):
 
 
         user_id = m.from_user.id
+        is_premium = user_id in ADMINS or await db.has_premium_access(user_id)
+        is_file_limit = await db.file_limit_status(client.me.id)
+        files_limit = await db.get_files_limit(client.me.id)
+
         if not await db.has_premium_access(user_id):
             try:
                 grp_id = int(grp_id)
@@ -345,6 +349,18 @@ async def start(client, message):
                 filesarr = []
                 cover = None
                 for file in files:
+                    if is_file_limit and not is_premium:
+                        user_count = await db.get_user_file_count(user_id)
+                        if user_count >= files_limit:
+                            btn = [[InlineKeyboardButton("🎟️ ᴜᴘɢʀᴀᴅᴇ ᴛᴏ ᴘʀᴇᴍɪᴜᴍ 🎟️", callback_data="premium_info")]]
+                            await client.send_message(
+                                chat_id=user_id,
+                                text=f"<b>📊 ʏᴏᴜ ʜᴀᴠᴇ ʀᴇᴄᴇɪᴠᴇᴅ {user_count}/{files_limit} ꜰʀᴇᴇ ꜰɪʟᴇꜱ ᴛᴏᴅᴀʏ.</b>\n\n"
+                                     f"<b>‼️ ʏᴏᴜ ʜᴀᴠᴇ ʀᴇᴀᴄʜᴇᴅ ʏᴏᴜʀ ᴅᴀɪʟʏ ꜰʀᴇᴇ ꜰɪʟᴇ ʟɪᴍɪᴛ. ᴘʟᴇᴀꜱᴇ ᴜᴘɢʀᴀᴅᴇ ᴛᴏ ᴘʀᴇᴍɪᴜᴍ ꜰᴏʀ ᴜɴʟɪᴍɪᴛᴇᴅ ᴀᴄᴄᴇꜱꜱ!</b>",
+                                reply_markup=InlineKeyboardMarkup(btn)
+                            )
+                            break
+                        user_count = await db.increment_user_file_count(user_id)
                     file_id = file.file_id
                     files_ = await get_file_details(file_id)
                     files1 = files_[0]
@@ -362,6 +378,8 @@ async def start(client, message):
                             f_caption = f_caption
                     if f_caption is None:
                         f_caption = f"{clean_filename(files1.file_name)}"
+                    if is_file_limit and not is_premium:
+                        f_caption += f"\n\n📊 ʏᴏᴜ ʜᴀᴠᴇ ʀᴇᴄᴇɪᴠᴇᴅ {user_count}/{files_limit} ꜰʀᴇᴇ ꜰɪʟᴇꜱ ᴛᴏᴅᴀʏ."
                     btn = await stream_buttons(message.from_user.id, file_id)
                     msg = await client.send_cached_media(
                         chat_id=message.from_user.id,
@@ -372,6 +390,13 @@ async def start(client, message):
                         reply_markup=InlineKeyboardMarkup(btn)
                     )
                     filesarr.append(msg)
+                if not filesarr:
+                    if sticker:
+                        try:
+                            await sticker.delete()
+                        except Exception:
+                            pass
+                    return
                 k = await client.send_message(chat_id=message.from_user.id, text=script.DEL_MSG.format(get_time(DELETE_TIME)), parse_mode=enums.ParseMode.HTML)
                 await sticker.delete()
                 await asyncio.sleep(DELETE_TIME)
@@ -391,6 +416,22 @@ async def start(client, message):
                 raise ValueError("Invalid encoded data")
             file_id = raw[sep + 1:].decode("latin1")
             try:
+                if is_file_limit and not is_premium:
+                    user_count = await db.get_user_file_count(user_id)
+                    if user_count >= files_limit:
+                        btn = [[InlineKeyboardButton("🎟️ ᴜᴘɢʀᴀᴅᴇ ᴛᴏ ᴘʀᴇᴍɪᴜᴍ 🎟️", callback_data="premium_info")]]
+                        await message.reply_text(
+                            f"<b>📊 ʏᴏᴜ ʜᴀᴠᴇ ʀᴇᴄᴇɪᴠᴇᴅ {user_count}/{files_limit} ꜰʀᴇᴇ ꜰɪʟᴇꜱ ᴛᴏᴅᴀʏ.</b>\n\n"
+                            f"<b>‼️ ʏᴏᴜ ʜᴀᴠᴇ ʀᴇᴀᴄʜᴇᴅ ʏᴏᴜʀ ᴅᴀɪʟʏ ꜰʀᴇᴇ ꜰɪʟᴇ ʟɪᴍɪᴛ. ᴘʟᴇᴀꜱᴇ ᴜᴘɢʀᴀᴅᴇ ᴛᴏ ᴘʀᴇᴍɪᴜᴍ ꜰᴏʀ ᴜɴʟɪᴍɪᴛᴇᴅ ᴀᴄᴄᴇꜱꜱ!</b>",
+                            reply_markup=InlineKeyboardMarkup(btn)
+                        )
+                        if sticker:
+                            try:
+                                await sticker.delete()
+                            except Exception:
+                                pass
+                        return
+                    user_count = await db.increment_user_file_count(user_id)
                 cover = None
                 if COVERX:
                     details = await get_file_details(file_id)
@@ -415,6 +456,8 @@ async def start(client, message):
                         f_caption=DREAMX_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='')
                     except Exception:
                         return
+                if is_file_limit and not is_premium:
+                    f_caption += f"\n\n📊 ʏᴏᴜ ʜᴀᴠᴇ ʀᴇᴄᴇɪᴠᴇᴅ {user_count}/{files_limit} ꜰʀᴇᴇ ꜰɪʟᴇꜱ ᴛᴏᴅᴀʏ."
                 await msg.edit_caption(
                     f_caption,
                     reply_markup=InlineKeyboardMarkup(btn)
@@ -432,6 +475,23 @@ async def start(client, message):
                 pass
             return await message.reply('ɴᴏ ꜱᴜᴄʜ ꜰɪʟᴇ ᴇxɪꜱᴛꜱ !')
 
+        if is_file_limit and not is_premium:
+            user_count = await db.get_user_file_count(user_id)
+            if user_count >= files_limit:
+                btn = [[InlineKeyboardButton("🎟️ ᴜᴘɢʀᴀᴅᴇ ᴛᴏ ᴘʀᴇᴍɪᴜᴍ 🎟️", callback_data="premium_info")]]
+                await message.reply_text(
+                    f"<b>📊 ʏᴏᴜ ʜᴀᴠᴇ ʀᴇᴄᴇɪᴠᴇᴅ {user_count}/{files_limit} ꜰʀᴇᴇ ꜰɪʟᴇꜱ ᴛᴏᴅᴀʏ.</b>\n\n"
+                    f"<b>‼️ ʏᴏᴜ ʜᴀᴠᴇ ʀᴇᴀᴄʜᴇᴅ ʏᴏᴜʀ ᴅᴀɪʟʏ ꜰʀᴇᴇ ꜰɪʟᴇ ʟɪᴍɪᴛ. ᴘʟᴇᴀꜱᴇ ᴜᴘɢʀᴀᴅᴇ ᴛᴏ ᴘʀᴇᴍɪᴜᴍ ꜰᴏʀ ᴜɴʟɪᴍɪᴛᴇᴅ ᴀᴄᴄᴇꜱꜱ!</b>",
+                    reply_markup=InlineKeyboardMarkup(btn)
+                )
+                if sticker:
+                    try:
+                        await sticker.delete()
+                    except Exception:
+                        pass
+                return
+            user_count = await db.increment_user_file_count(user_id)
+
         files = files_[0]
         title = clean_filename(files.file_name)
         size = get_size(files.file_size)
@@ -448,6 +508,8 @@ async def start(client, message):
 
         if f_caption is None:
             f_caption = clean_filename(files.file_name)
+        if is_file_limit and not is_premium:
+            f_caption += f"\n\n📊 ʏᴏᴜ ʜᴀᴠᴇ ʀᴇᴄᴇɪᴠᴇᴅ {user_count}/{files_limit} ꜰʀᴇᴇ ꜰɪʟᴇꜱ ᴛᴏᴅᴀʏ."
         btn = await stream_buttons(message.from_user.id, file_id)
         msg = await client.send_cached_media(
             chat_id=message.from_user.id,
@@ -991,6 +1053,37 @@ async def set_movie_update_notification(client, message):
     except Exception as e:
         logger.error(f"Error in set_movie_update_notification: {e}")
         await message.reply_text(f"<b>❗ An error occurred: {e}</b>")
+
+@Client.on_message(filters.private & filters.command(["file_limit", "set_file_limit"]) & filters.user(ADMINS))
+async def set_file_limit_cmd(client, message):
+    bot_id = client.me.id
+    if len(message.command) < 2:
+        status = await db.file_limit_status(bot_id)
+        limit = await db.get_files_limit(bot_id)
+        status_str = "ENABLED ✅" if status else "DISABLED ❌"
+        return await message.reply_text(
+            f"<b>📊 <u>ꜰɪʟᴇ ʟɪᴍɪᴛ ꜱᴇᴛᴛɪɴɢꜱ</u></b>\n\n"
+            f"<b>• ꜱᴛᴀᴛᴜꜱ: {status_str}</b>\n"
+            f"<b>• ᴅᴀɪʟʏ ʟɪᴍɪᴛ: <code>{limit}</code> ꜰɪʟᴇꜱ</b>\n\n"
+            f"<b><u>ᴜꜱᴀɢᴇ:</u></b>\n"
+            f"• <code>/file_limit on</code> - ᴇɴᴀʙʟᴇ ꜰɪʟᴇ ʟɪᴍɪᴛ\n"
+            f"• <code>/file_limit off</code> - ᴅɪꜱᴀʙʟᴇ ꜰɪʟᴇ ʟɪᴍɪᴛ\n"
+            f"• <code>/file_limit 10</code> - ꜱᴇᴛ ᴅᴀɪʟʏ ꜰɪʟᴇ ʟɪᴍɪᴛ ᴛᴏ 10"
+        )
+
+    arg = message.command[1].strip().lower()
+    if arg in ['on', 'true', 'enable']:
+        await db.update_file_limit_status(bot_id, True)
+        await message.reply_text("<b>📊 ꜰɪʟᴇ ʟɪᴍɪᴛ ᴇɴᴀʙʟᴇᴅ ✅</b>")
+    elif arg in ['off', 'false', 'disable']:
+        await db.update_file_limit_status(bot_id, False)
+        await message.reply_text("<b>📊 ꜰɪʟᴇ ʟɪᴍɪᴛ ᴅɪꜱᴀʙʟᴇᴅ ❌</b>")
+    elif arg.isdigit():
+        num = int(arg)
+        await db.update_files_limit(bot_id, num)
+        await message.reply_text(f"<b>📊 ᴅᴀɪʟʏ ꜰɪʟᴇ ʟɪᴍɪᴛ ꜱᴇᴛ ᴛᴏ <code>{num}</code> ꜰɪʟᴇꜱ ✅</b>")
+    else:
+        await message.reply_text("<b>💔 ɪɴᴠᴀʟɪᴅ ᴏᴘᴛɪᴏɴ. ᴜꜱᴇ 'on', 'off', ᴏʀ ᴀ ɴᴜᴍʙᴇR.</b>")
 
 @Client.on_message(filters.command("restart") & filters.user(ADMINS))
 async def stop_button(bot, message):
