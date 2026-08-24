@@ -950,12 +950,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
     elif query.data.startswith("opnsetgrp"):
         ident, grp_id = query.data.split("#")
         userid = query.from_user.id if query.from_user else None
-        st = await client.get_chat_member(grp_id, userid)
-        if (
-                st.status != enums.ChatMemberStatus.ADMINISTRATOR
-                and st.status != enums.ChatMemberStatus.OWNER
-                and str(userid) not in ADMINS
-        ):
+        if not await is_check_admin(client, int(grp_id), userid):
             await query.answer("ʏᴏᴜ ᴅᴏɴ'ᴛ ʜᴀᴠᴇ ʀɪɢʜᴛꜱ ᴛᴏ ᴅᴏ ᴛʜɪꜱ !", show_alert=True)
             return
         title = query.message.chat.title
@@ -965,20 +960,17 @@ async def cb_handler(client: Client, query: CallbackQuery):
             reply_markup = InlineKeyboardMarkup(btn)
             await query.message.edit_text(
                 text=await get_settings_text(grp_id, title),
+                reply_markup=reply_markup,
                 disable_web_page_preview=True,
                 parse_mode=enums.ParseMode.HTML
             )
-            await query.message.edit_reply_markup(reply_markup)
+        await query.answer()
+        return
 
     elif query.data.startswith("opnsetpm"):
         ident, grp_id = query.data.split("#")
         userid = query.from_user.id if query.from_user else None
-        st = await client.get_chat_member(grp_id, userid)
-        if (
-                st.status != enums.ChatMemberStatus.ADMINISTRATOR
-                and st.status != enums.ChatMemberStatus.OWNER
-                and str(userid) not in ADMINS
-        ):
+        if not await is_check_admin(client, int(grp_id), userid):
             await query.answer("Yᴏᴜ ᴅᴏɴ'ᴛ ʜᴀᴠᴇ sᴜғғɪᴄɪᴀɴᴛ ʀɪɢʜᴛs ᴛᴏ ᴅᴏ ᴛʜɪs !", show_alert=True)
             return
         title = query.message.chat.title
@@ -988,8 +980,11 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 "ᴄʜᴇᴄᴋ ᴍʏ ᴅᴍ 🗳️", url=f"telegram.me/{temp.U_NAME}")
         ]]
         reply_markup = InlineKeyboardMarkup(btn2)
-        await query.message.edit_text(f"<b>ʏᴏᴜʀ sᴇᴛᴛɪɴɢs ᴍᴇɴᴜ ғᴏʀ {title} ʜᴀs ʙᴇᴇɴ sᴇɴᴛ ᴛᴏ ʏᴏᴜ ʙʏ ᴅᴍ.</b>")
-        await query.message.edit_reply_markup(reply_markup)
+        await query.message.edit_text(
+            f"<b>ʏᴏᴜʀ sᴇᴛᴛɪɴɢs ᴍᴇɴᴜ ғᴏʀ {title} ʜᴀs ʙᴇᴇɴ sᴇɴᴛ ᴛᴏ ʏᴏᴜ ʙʏ ᴅᴍ.</b>",
+            reply_markup=reply_markup,
+            parse_mode=enums.ParseMode.HTML
+        )
         if settings is not None:
             btn = await group_setting_buttons(int(grp_id))
             reply_markup = InlineKeyboardMarkup(btn)
@@ -998,9 +993,10 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 text=await get_settings_text(grp_id, title),
                 reply_markup=reply_markup,
                 disable_web_page_preview=True,
-                parse_mode=enums.ParseMode.HTML,
-                reply_to_message_id=query.message.id
+                parse_mode=enums.ParseMode.HTML
             )
+        await query.answer()
+        return
 
     elif query.data.startswith("show_option"):
         ident, from_user = query.data.split("#")
@@ -1447,6 +1443,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
             btn = await group_setting_buttons(int(grp_id))
             reply_markup = InlineKeyboardMarkup(btn)
             await query.message.edit_reply_markup(reply_markup)
+        return
     await query.answer(MSG_ALRT)
 
 

@@ -721,7 +721,7 @@ async def prompt_group_deletion(client, query):
         buttons = [
             [
                 InlineKeyboardButton('ʏᴇs, ᴅᴇʟᴇᴛᴇ', callback_data=f'delete_group#{grp_id}', style=enums.ButtonStyle.DANGER),
-                InlineKeyboardButton('ᴄᴀɴᴄᴇʟ', callback_data=f'open_settings#{grp_id}')
+                InlineKeyboardButton('ᴄᴀɴᴄᴇʟ', callback_data=f'grp_pm#{grp_id}')
             ]
         ]
         await query.message.edit_text(
