@@ -46,7 +46,7 @@ async def broadcast_users(bot, message):
 
     is_pin = dreamxbotz_user_response.text == "Yes"
     b_msg = message.reply_to_message
-    users = [user async for user in await db.get_all_users()]
+    users = [user async for user in db.get_all_users()]
     total_users = len(users)
     dreamxbotz_status_msg = await message.reply_text("📤 <b>Broadcasting your message...</b>")
     success = blocked = deleted = failed = 0
@@ -126,7 +126,7 @@ async def broadcast_group(bot, message):
         return await message.reply("❌ Invalid input. Broadcast cancelled.")
     is_pin = dreamxbotz_user_response.text == "Yes"
     b_msg = message.reply_to_message
-    chats = await db.get_all_chats()
+    chats = db.get_all_chats()
     total_chats = await db.total_chat_count()
     dreamxbotz_status_msg = await message.reply_text("📤 <b>Broadcasting your message to groups...</b>")
     start_time = time.time()
@@ -181,7 +181,7 @@ async def broadcast_group(bot, message):
 
 @Client.on_message(filters.command("clear_junk") & filters.user(ADMINS))
 async def remove_junkuser__db(bot, message):
-    users = await db.get_all_users()
+    users = db.get_all_users()
     b_msg = message 
     sts = await message.reply_text('ɪɴ ᴘʀᴏɢʀᴇss.... ᴘʟᴇᴀsᴇ ᴡᴀɪᴛ')   
     start_time = time.time()
@@ -208,7 +208,7 @@ async def remove_junkuser__db(bot, message):
 
 @Client.on_message(filters.command(["junk_group", "clear_junk_group"]) & filters.user(ADMINS))
 async def junk_clear_group(bot, message):
-    groups = await db.get_all_chats()
+    groups = db.get_all_chats()
     if not groups:
         grp = await message.reply_text("❌ Nᴏ ɢʀᴏᴜᴘs ғᴏᴜɴᴅ ғᴏʀ ᴄʟᴇᴀʀ Jᴜɴᴋ ɢʀᴏᴜᴘs.")
         await asyncio.sleep(60)
