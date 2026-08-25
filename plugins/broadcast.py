@@ -31,9 +31,13 @@ async def _process_users_batch(batch, b_msg, pin):
     valid_count = 0
     invalid_failed = 0
     for user in batch:
-        raw_id = user.get('id') if isinstance(user, dict) else None
-        if raw_id is None and isinstance(user, dict):
-            raw_id = user.get('user_id') or user.get('_id')
+        if isinstance(user, (int, str)):
+            raw_id = user
+        elif isinstance(user, dict):
+            raw_id = user.get('id') or user.get('user_id') or user.get('_id')
+        else:
+            raw_id = None
+
         if raw_id is None:
             invalid_failed += 1
             continue
@@ -151,9 +155,13 @@ async def _process_groups_batch(batch, b_msg, pin):
     valid_count = 0
     invalid_failed = 0
     for chat in batch:
-        raw_id = chat.get('id') if isinstance(chat, dict) else None
-        if raw_id is None and isinstance(chat, dict):
-            raw_id = chat.get('chat_id') or chat.get('_id')
+        if isinstance(chat, (int, str)):
+            raw_id = chat
+        elif isinstance(chat, dict):
+            raw_id = chat.get('id') or chat.get('chat_id') or chat.get('_id')
+        else:
+            raw_id = None
+
         if raw_id is None:
             invalid_failed += 1
             continue
@@ -278,7 +286,12 @@ async def remove_junkuser__db(bot, message):
     failed = 0
     done = 0
     async for user in users:
-        raw_id = user.get('id') or user.get('user_id') or user.get('_id') if isinstance(user, dict) else None
+        if isinstance(user, (int, str)):
+            raw_id = user
+        elif isinstance(user, dict):
+            raw_id = user.get('id') or user.get('user_id') or user.get('_id')
+        else:
+            raw_id = None
         if not raw_id:
             done += 1
             failed += 1
@@ -330,7 +343,12 @@ async def junk_clear_group(bot, message):
     failed = ""
     deleted = 0
     async for group in groups:
-        raw_id = group.get('id') or group.get('chat_id') or group.get('_id') if isinstance(group, dict) else None
+        if isinstance(group, (int, str)):
+            raw_id = group
+        elif isinstance(group, dict):
+            raw_id = group.get('id') or group.get('chat_id') or group.get('_id')
+        else:
+            raw_id = None
         if not raw_id:
             done += 1
             continue
