@@ -43,6 +43,8 @@ class temp(object):
     ME = None
     CURRENT=int(os.environ.get("SKIP", 2))
     CANCEL = False
+    USERS_CANCEL = False
+    GROUPS_CANCEL = False
     B_USERS_CANCEL = False
     B_GROUPS_CANCEL = False 
     MELCOW = {}
