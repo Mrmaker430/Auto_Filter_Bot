@@ -140,15 +140,14 @@ async def is_check_admin(bot, chat_id, user_id):
     
 async def users_broadcast(user_id, message, is_pin):
     try:
-        m=await message.copy(chat_id=user_id)
+        if not hasattr(message, 'web_page_preview'):
+            message.web_page_preview = None
+        m = await message.copy(chat_id=user_id)
         if is_pin:
-            try:
-                await m.pin(both_sides=True)
-            except Exception as e:
-                logger.warning(f"Failed to pin message for user {user_id}: {e}")
+            await m.pin(both_sides=True)
         return True, "Success"
     except FloodWait as e:
-        await asyncio.sleep(e.x)
+        await asyncio.sleep(e.value)
         return await users_broadcast(user_id, message, is_pin)
     except InputUserDeactivated:
         await db.delete_user(int(user_id))
@@ -163,11 +162,13 @@ async def users_broadcast(user_id, message, is_pin):
         logging.info(f"{user_id} - PeerIdInvalid")
         return False, "Error"
     except Exception as e:
-        logger.exception(f"Error broadcasting message to user {user_id}: {e}")
+        logging.error(f"[BROADCAST FAIL] user={user_id} | {type(e).__name__}: {e}")
         return False, "Error"
-
+        
 async def groups_broadcast(chat_id, message, is_pin):
     try:
+        if not hasattr(message, 'web_page_preview'):
+            message.web_page_preview = None
         m = await message.copy(chat_id=chat_id)
         if is_pin:
             try:
@@ -176,10 +177,9 @@ async def groups_broadcast(chat_id, message, is_pin):
                 pass
         return "Success"
     except FloodWait as e:
-        await asyncio.sleep(e.x)
+        await asyncio.sleep(e.value)
         return await groups_broadcast(chat_id, message, is_pin)
-    except Exception as e:
-        logger.exception(f"Error broadcasting message to group {chat_id}: {e}")
+    except Exception:
         await db.delete_chat(chat_id)
         return "Error"
 
