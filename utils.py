@@ -142,7 +142,10 @@ async def users_broadcast(user_id, message, is_pin):
     try:
         m=await message.copy(chat_id=user_id)
         if is_pin:
-            await m.pin(both_sides=True)
+            try:
+                await m.pin(both_sides=True)
+            except Exception as e:
+                logger.warning(f"Failed to pin message for user {user_id}: {e}")
         return True, "Success"
     except FloodWait as e:
         await asyncio.sleep(e.x)

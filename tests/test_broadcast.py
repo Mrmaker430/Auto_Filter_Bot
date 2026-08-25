@@ -86,6 +86,39 @@ async def test_users_broadcast_handler():
 
 
 @pytest.mark.asyncio
+async def test_users_broadcast_handler_fallback_and_invalid_docs():
+    """Verify that users_broadcast_handler safely handles user_id, _id, and invalid documents."""
+    from plugins.broadcast import users_broadcast_handler
+
+    mock_bot = AsyncMock()
+    status_msg = AsyncMock()
+
+    dummy_users = DummyAsyncCursor([
+        {"id": 111, "name": "User 1"},
+        {"user_id": 222, "name": "User 2"},
+        {"_id": 333, "name": "User 3"},
+        {"invalid": "no id field"},
+        {"id": "not_an_int"}
+    ])
+
+    mock_msg = MagicMock()
+    mock_msg.command = ["broadcast"]
+    mock_msg.reply_to_message = AsyncMock()
+    mock_msg.reply_text = AsyncMock(return_value=status_msg)
+
+    with patch("plugins.broadcast.db") as mock_db, patch("plugins.broadcast.users_broadcast") as mock_ub:
+        mock_db.get_all_users.return_value = dummy_users
+        mock_db.total_users_count = AsyncMock(return_value=5)
+        mock_ub.return_value = (True, "Success")
+
+        await users_broadcast_handler(mock_bot, mock_msg)
+
+        # Should have called users_broadcast for 111, 222, 333 (3 valid users out of 5)
+        assert mock_ub.call_count == 3
+        status_msg.edit.assert_called()
+
+
+@pytest.mark.asyncio
 async def test_groups_broadcast_handler():
     from plugins.broadcast import groups_broadcast_handler
 
@@ -108,6 +141,52 @@ async def test_groups_broadcast_handler():
 
         assert mock_gb.call_count == 2
         status_msg.edit.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_groups_broadcast_handler_fallback_and_invalid_docs():
+    """Verify that groups_broadcast_handler safely handles chat_id, _id, and invalid documents."""
+    from plugins.broadcast import groups_broadcast_handler
+
+    mock_bot = AsyncMock()
+    status_msg = AsyncMock()
+
+    dummy_chats = DummyAsyncCursor([
+        {"id": -1001, "title": "Grp 1"},
+        {"chat_id": -1002, "title": "Grp 2"},
+        {"_id": -1003, "title": "Grp 3"},
+        {"corrupted": True}
+    ])
+
+    mock_msg = MagicMock()
+    mock_msg.command = ["grp_broadcast"]
+    mock_msg.reply_to_message = AsyncMock()
+    mock_msg.reply_text = AsyncMock(return_value=status_msg)
+
+    with patch("plugins.broadcast.db") as mock_db, patch("plugins.broadcast.groups_broadcast") as mock_gb:
+        mock_db.get_all_chats.return_value = dummy_chats
+        mock_db.total_chat_count = AsyncMock(return_value=4)
+        mock_gb.return_value = "Success"
+
+        await groups_broadcast_handler(mock_bot, mock_msg)
+
+        # Should have called groups_broadcast for -1001, -1002, -1003 (3 valid groups out of 4)
+        assert mock_gb.call_count == 3
+        status_msg.edit.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_broadcast_no_reply():
+    from plugins.broadcast import users_broadcast_handler
+
+    mock_bot = AsyncMock()
+    mock_msg = MagicMock()
+    mock_msg.command = ["broadcast"]
+    mock_msg.reply_to_message = None
+    mock_msg.reply = AsyncMock()
+
+    await users_broadcast_handler(mock_bot, mock_msg)
+    mock_msg.reply.assert_called_once_with("⚠️ <b>Please reply to a message to broadcast!</b>")
 
 
 @pytest.mark.asyncio
