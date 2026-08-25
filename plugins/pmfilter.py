@@ -82,10 +82,12 @@ async def give_filter(client, message):
 
 @Client.on_message(filters.private & filters.text & filters.incoming & ~filters.regex(r"^/") & ~filters.regex(r"(https?://)?(t\.me|telegram\.me|telegram\.dog)/"), group=1)
 async def pm_text(bot, message):
+    user_id = message.from_user.id if message.from_user else 0
+    if user_id in ADMINS:
+        return
     bot_id = bot.me.id
     content = message.text
     user = message.from_user.first_name
-    user_id = message.from_user.id
     if EMOJI_MODE:
         try:
             await message.react(emoji=random.choice(REACTIONS), big=True)
