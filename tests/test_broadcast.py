@@ -95,8 +95,8 @@ async def test_users_broadcast_handler_fallback_and_invalid_docs():
 
     dummy_users = DummyAsyncCursor([
         {"id": 111, "name": "User 1"},
-        {"user_id": 222, "name": "User 2"},
-        {"_id": 333, "name": "User 3"},
+        {"id": None, "user_id": 222, "name": "User 2"},
+        {"id": None, "user_id": None, "_id": 333, "name": "User 3"},
         {"invalid": "no id field"},
         {"id": "not_an_int"}
     ])
@@ -153,8 +153,8 @@ async def test_groups_broadcast_handler_fallback_and_invalid_docs():
 
     dummy_chats = DummyAsyncCursor([
         {"id": -1001, "title": "Grp 1"},
-        {"chat_id": -1002, "title": "Grp 2"},
-        {"_id": -1003, "title": "Grp 3"},
+        {"id": None, "chat_id": -1002, "title": "Grp 2"},
+        {"id": None, "chat_id": None, "_id": -1003, "title": "Grp 3"},
         {"corrupted": True}
     ])
 

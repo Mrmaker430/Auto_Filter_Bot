@@ -162,7 +162,8 @@ async def users_broadcast(user_id, message, is_pin):
         await db.delete_user(int(user_id))
         logging.info(f"{user_id} - PeerIdInvalid")
         return False, "Error"
-    except Exception:
+    except Exception as e:
+        logger.exception(f"Error broadcasting message to user {user_id}: {e}")
         return False, "Error"
 
 async def groups_broadcast(chat_id, message, is_pin):
@@ -177,7 +178,8 @@ async def groups_broadcast(chat_id, message, is_pin):
     except FloodWait as e:
         await asyncio.sleep(e.x)
         return await groups_broadcast(chat_id, message, is_pin)
-    except Exception:
+    except Exception as e:
+        logger.exception(f"Error broadcasting message to group {chat_id}: {e}")
         await db.delete_chat(chat_id)
         return "Error"
 
