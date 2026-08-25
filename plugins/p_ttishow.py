@@ -298,7 +298,7 @@ async def unban_a_user(bot, message):
 @Client.on_message(filters.command('users') & filters.user(ADMINS))
 async def list_users(bot, message):
     dreamxbotz = await message.reply('Getting List Of Users')
-    users = await db.get_all_users()
+    users = db.get_all_users()
     out = "Users Saved In DB Are:\n\n"
     async for user in users:
         out += f"<a href=tg://user?id={user['id']}>{user['name']}</a>"
@@ -315,7 +315,7 @@ async def list_users(bot, message):
 @Client.on_message(filters.command('chats') & filters.user(ADMINS))
 async def list_chats(bot, message):
     dreamxbotz = await message.reply('Getting List Of chats')
-    chats = await db.get_all_chats()
+    chats = db.get_all_chats()
     out = "Chats Saved In DB Are:\n\n"
     async for chat in chats:
         out += f"**Title:** `{chat['title']}`\n**- ID:** `{chat['id']}`"

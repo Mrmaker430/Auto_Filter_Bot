@@ -860,7 +860,7 @@ async def send_msg(bot, message):
         success = False
         try:
             user = await bot.get_users(target_id)
-            users = await db.get_all_users()
+            users = db.get_all_users()
             async for usr in users:
                 out += f"{usr['id']}"
                 out += '\n'
@@ -1545,7 +1545,7 @@ async def clean_groups_handler(client, message):
     total_groups = await db.total_chat_count()
     processed = 0
     batch_size = 100
-    chats = await db.get_all_chats()
+    chats = db.get_all_chats()
     async for chat in chats:
         try:
             processed += 1
