@@ -138,50 +138,49 @@ async def is_check_admin(bot, chat_id, user_id):
     except Exception:
         return False
     
-async def users_broadcast(user_id, message, is_pin):
+async def broadcast_messages(user_id, message, pin):
     try:
-        if not hasattr(message, 'web_page_preview'):
-            message.web_page_preview = None
-        m = await message.copy(chat_id=user_id)
-        if is_pin:
-            await m.pin(both_sides=True)
-        return True, "Success"
-    except FloodWait as e:
-        await asyncio.sleep(e.value)
-        return await users_broadcast(user_id, message, is_pin)
-    except InputUserDeactivated:
-        await db.delete_user(int(user_id))
-        logging.info(f"{user_id}-Removed from Database, since deleted account.")
-        return False, "Deleted"
-    except UserIsBlocked:
-        logging.info(f"{user_id} -Blocked the bot.")
-        await db.delete_user(user_id)
-        return False, "Blocked"
-    except PeerIdInvalid:
-        await db.delete_user(int(user_id))
-        logging.info(f"{user_id} - PeerIdInvalid")
-        return False, "Error"
-    except Exception as e:
-        logging.error(f"[BROADCAST FAIL] user={user_id} | {type(e).__name__}: {e}")
-        return False, "Error"
-        
-async def groups_broadcast(chat_id, message, is_pin):
-    try:
-        if not hasattr(message, 'web_page_preview'):
-            message.web_page_preview = None
-        m = await message.copy(chat_id=chat_id)
-        if is_pin:
+        m = await message.copy(chat_id=int(user_id))
+        if pin:
             try:
-                await m.pin()
+                await m.pin(both_sides=True)
             except Exception:
                 pass
         return "Success"
     except FloodWait as e:
         await asyncio.sleep(e.value)
-        return await groups_broadcast(chat_id, message, is_pin)
-    except Exception:
-        await db.delete_chat(chat_id)
+        return await broadcast_messages(user_id, message, pin)
+    except (InputUserDeactivated, UserIsBlocked, PeerIdInvalid):
+        await db.delete_user(int(user_id))
         return "Error"
+    except Exception as e:
+        logger.error(f"[BROADCAST FAIL] user={user_id} | {type(e).__name__}: {e}")
+        await db.delete_user(int(user_id))
+        return "Error"
+
+async def users_broadcast(user_id, message, is_pin):
+    sts = await broadcast_messages(user_id, message, is_pin)
+    return (sts == "Success", sts)
+
+async def groups_broadcast_messages(chat_id, message, pin):
+    try:
+        k = await message.copy(chat_id=int(chat_id))
+        if pin:
+            try:
+                await k.pin()
+            except Exception:
+                pass
+        return "Success"
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
+        return await groups_broadcast_messages(chat_id, message, pin)
+    except Exception as e:
+        logger.error(f"[GROUP BROADCAST FAIL] chat={chat_id} | {type(e).__name__}: {e}")
+        await db.delete_chat(int(chat_id))
+        return "Error"
+
+async def groups_broadcast(chat_id, message, is_pin):
+    return await groups_broadcast_messages(chat_id, message, is_pin)
 
 async def junk_group(chat_id, message):
     try:
