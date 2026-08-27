@@ -118,7 +118,7 @@ class Database:
             return default
         return user.get('ban_status', default)
 
-    async def get_all_users(self):
+    def get_all_users(self):
         return self.col.find({})
     
     async def delete_user(self, user_id):
@@ -220,7 +220,7 @@ class Database:
         count = await self.grp.count_documents({})
         return count
     
-    async def get_all_chats(self):
+    def get_all_chats(self):
         return self.grp.find({})
 
     async def get_db_size(self):

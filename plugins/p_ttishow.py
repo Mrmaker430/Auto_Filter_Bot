@@ -1,6 +1,8 @@
 import logging
 import asyncio
 import psutil
+import os
+import html
 from time import time
 from pyrogram import Client, filters, enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -298,36 +300,44 @@ async def unban_a_user(bot, message):
 @Client.on_message(filters.command('users') & filters.user(ADMINS))
 async def list_users(bot, message):
     dreamxbotz = await message.reply('Getting List Of Users')
-    users = await db.get_all_users()
+    users = db.get_all_users()
     out = "Users Saved In DB Are:\n\n"
     async for user in users:
-        out += f"<a href=tg://user?id={user['id']}>{user['name']}</a>"
-        if user['ban_status']['is_banned']:
-            out += '( Banned User )'
+        name = html.escape(str(user.get('name', '')))
+        out += f"<a href=tg://user?id={user['id']}>{name}</a>"
+        if user.get('ban_status', {}).get('is_banned'):
+            out += ' ( Banned User )'
         out += '\n'
     try:
-        await dreamxbotz.edit_text(out)
-    except MessageTooLong:
-        with open('users.txt', 'w+') as outfile:
+        await dreamxbotz.edit_text(out, disable_web_page_preview=True)
+    except (MessageTooLong, Exception) as e:
+        logger.warning(f"Failed to edit text in list_users, sending doc instead: {e}")
+        with open('users.txt', 'w+', encoding='utf-8') as outfile:
             outfile.write(out)
         await message.reply_document('users.txt', caption="List Of Users")
+        if os.path.exists('users.txt'):
+            os.remove('users.txt')
 
 @Client.on_message(filters.command('chats') & filters.user(ADMINS))
 async def list_chats(bot, message):
     dreamxbotz = await message.reply('Getting List Of chats')
-    chats = await db.get_all_chats()
+    chats = db.get_all_chats()
     out = "Chats Saved In DB Are:\n\n"
     async for chat in chats:
-        out += f"**Title:** `{chat['title']}`\n**- ID:** `{chat['id']}`"
-        if chat['chat_status']['is_disabled']:
-            out += '( Disabled Chat )'
+        title = chat.get('title', '')
+        out += f"**Title:** `{title}`\n**- ID:** `{chat['id']}`"
+        if chat.get('chat_status', {}).get('is_disabled'):
+            out += ' ( Disabled Chat )'
         out += '\n'
     try:
         await dreamxbotz.edit_text(out)
-    except MessageTooLong:
-        with open('chats.txt', 'w+') as outfile:
+    except (MessageTooLong, Exception) as e:
+        logger.warning(f"Failed to edit text in list_chats, sending doc instead: {e}")
+        with open('chats.txt', 'w+', encoding='utf-8') as outfile:
             outfile.write(out)
         await message.reply_document('chats.txt', caption="List Of Chats")
+        if os.path.exists('chats.txt'):
+            os.remove('chats.txt')
 
 
 @Client.on_message(filters.command('group_cmd'))
