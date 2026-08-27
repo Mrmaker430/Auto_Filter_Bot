@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime
 from collections import defaultdict
 from plugins.Dreamxfutures.Imdbposter import get_movie_detailsx, fetch_image, get_movie_details
+from plugins.Dreamxfutures.poster_generator import generate_movie_poster
 from database.users_chats_db import db
 from pyrogram import Client, filters, enums
 from info import CHANNELS, MOVIE_UPDATE_CHANNEL, LINK_PREVIEW, ABOVE_PREVIEW, BAD_WORDS, LANDSCAPE_POSTER, TMDB_POSTER, GRP_LNK
@@ -321,10 +322,14 @@ async def _process_with_lock(bot, filename, caption, media_info, base_name, proc
         movie_doc = {
             "_id": base_name,
             "files": [file_data],
-            "poster_url": details.get("backdrop_url") if LANDSCAPE_POSTER and TMDB_POSTER and details.get("backdrop_url") and not error_tmdb else details.get("poster_url"),
+            "title": details.get("title") or base_name,
+            "plot": details.get("plot", ""),
+            "poster_url": details.get("poster_url"),
+            "backdrop_url": details.get("backdrop_url"),
+            "logo_url": details.get("logo_url"),
             "genres": genres,
             "rating": details.get("rating", "N/A"),
-            "imdb_url": details.get("url", "")if not TMDB_POSTER or error_tmdb else details.get("tmdb_url"),
+            "imdb_url": details.get("url", "") if not TMDB_POSTER or error_tmdb else details.get("tmdb_url"),
             "year": details.get("year") or media_info["year"],
             "tag": media_info["tag"],
             "ott_platform": media_info["ott_platform"],
@@ -374,8 +379,29 @@ async def send_movie_update(bot, base_name):
                     style=enums.ButtonStyle.SUCCESS
                 )
             ]])
-            size=(2560, 1440) if LANDSCAPE_POSTER and TMDB_POSTER and movie_doc.get("is_backdrop") and not movie_doc.get("error_tmdb") else (853, 1280)
-            if movie_doc.get("poster_url") and not LINK_PREVIEW:
+            poster_details = {
+                "title": movie_doc.get("title") or base_name,
+                "rating": movie_doc.get("rating", "N/A"),
+                "year": movie_doc.get("year", ""),
+                "tag": movie_doc.get("tag", "#MOVIE"),
+                "genres": movie_doc.get("genres", "N/A"),
+                "plot": movie_doc.get("plot", ""),
+                "poster_url": movie_doc.get("poster_url"),
+                "backdrop_url": movie_doc.get("backdrop_url") or movie_doc.get("poster_url"),
+                "logo_url": movie_doc.get("logo_url"),
+            }
+            generated_poster = await generate_movie_poster(poster_details)
+            if generated_poster:
+                msg = await bot.send_photo(
+                    chat_id=MOVIE_UPDATE_CHANNEL,
+                    photo=generated_poster,
+                    caption=text,
+                    reply_markup=buttons,
+                    parse_mode=enums.ParseMode.HTML
+                )
+                is_photo = True
+            elif movie_doc.get("poster_url") and not LINK_PREVIEW:
+                size = (2560, 1440) if LANDSCAPE_POSTER and TMDB_POSTER and movie_doc.get("is_backdrop") and not movie_doc.get("error_tmdb") else (853, 1280)
                 resized_poster = await fetch_image(movie_doc["poster_url"], size)
                 if resized_poster:
                     msg = await bot.send_photo(
