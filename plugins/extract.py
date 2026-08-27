@@ -12,7 +12,8 @@ from telegraph import Telegraph
 from pymediainfo import MediaInfo
 
 from database.ia_filterdb import get_file_details
-from info import BIN_CHANNEL
+from database.users_chats_db import db
+from info import BIN_CHANNEL, ADMINS
 from dreamxbotz.util.file_properties import get_name
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,13 @@ def format_track(lang: str | None, title: str | None) -> str:
 
 @Client.on_callback_query(filters.regex(r"^extract_data"), group=2)
 async def extract_data_handler(client: Client, query: CallbackQuery):
+    bot_id = client.me.id
+    is_normal_user = (query.from_user.id not in ADMINS) and (not await db.has_premium_access(query.from_user.id))
+    limit_enabled = await db.is_file_limit_enabled(bot_id)
+
+    if is_normal_user and limit_enabled:
+        return await query.answer("⚠️ Normal users cannot view audio and subtitles info. Upgrade to premium to access this feature.", show_alert=True)
+
     try:
         await query.answer("Fetching Details...", show_alert=False)
     except Exception:

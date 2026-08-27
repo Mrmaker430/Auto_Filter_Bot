@@ -2,13 +2,14 @@ import datetime
 import logging
 import pytz  
 import motor.motor_asyncio
+from pymongo import ReturnDocument
 from info import (
     DATABASE_NAME,DATABASE_URI,DATABASE_URI2, MULTIPLE_DB, MAINTENANCE, PM_SEARCH,
     BUTTON_MODE, P_TTI_SHOW_OFF, PROTECT_CONTENT, IMDB, SPELL_CHECK_REPLY, MELCOW_NEW_USERS, 
     AUTO_DELETE, AUTO_FFILTER, MAX_BTN, IMDB_TEMPLATE, LOG_VR_CHANNEL, TUTORIAL, TUTORIAL_2,
     TUTORIAL_3, SHORTENER_API, SHORTENER_API2, SHORTENER_API3, SHORTENER_WEBSITE, SHORTENER_WEBSITE2,
     SHORTENER_WEBSITE3, IS_VERIFY, TWO_VERIFY_GAP, THREE_VERIFY_GAP, CUSTOM_FILE_CAPTION, AUTH_CHANNELS,
-    MOVIE_UPDATE_NOTIFICATION
+    MOVIE_UPDATE_NOTIFICATION, IS_FILE_LIMIT, FILES_LIMIT
 )
 
 
@@ -30,6 +31,7 @@ class Database:
         self.filename_col = self.db.filename
         self.movie_updates = self.db.movie_updates
         self.connection = self.db.connections
+        self.file_limits = self.db.file_limits
 
     async def add_name(self, filename):
         if await self.movie_updates.find_one({'_id': filename}):
@@ -447,6 +449,35 @@ class Database:
 
     async def update_maintenance_status(self, bot_id, enable):
         await self.update_bot_setting(bot_id, 'MAINTENANCE', enable)
+
+    async def is_file_limit_enabled(self, bot_id):
+        return await self.get_bot_setting(bot_id, 'IS_FILE_LIMIT', IS_FILE_LIMIT)
+
+    async def update_file_limit_status(self, bot_id, enable):
+        await self.update_bot_setting(bot_id, 'IS_FILE_LIMIT', enable)
+
+    async def get_file_limit(self, bot_id):
+        return await self.get_bot_setting(bot_id, 'FILES_LIMIT', FILES_LIMIT)
+
+    async def update_file_limit(self, bot_id, limit):
+        await self.update_bot_setting(bot_id, 'FILES_LIMIT', limit)
+
+    async def get_user_file_count(self, user_id: int) -> int:
+        ist = pytz.timezone('Asia/Kolkata')
+        today = datetime.datetime.now(ist).strftime("%Y-%m-%d")
+        doc = await self.file_limits.find_one({"user_id": user_id, "date": today})
+        return doc["count"] if doc else 0
+
+    async def increment_user_file_count(self, user_id: int) -> int:
+        ist = pytz.timezone('Asia/Kolkata')
+        today = datetime.datetime.now(ist).strftime("%Y-%m-%d")
+        res = await self.file_limits.find_one_and_update(
+            {"user_id": user_id, "date": today},
+            {"$inc": {"count": 1}},
+            upsert=True,
+            return_document=ReturnDocument.AFTER
+        )
+        return res["count"] if res else 1
      
 db = Database(DATABASE_URI, DATABASE_NAME)    
 if MULTIPLE_DB and DATABASE_URI2:

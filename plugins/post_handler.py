@@ -10,15 +10,18 @@ from pyrogram.types import (
 )
 from pyrogram.errors import MessageNotModified, MessageTooLong
 from plugins.Dreamxfutures.Imdbposter import get_movie_detailsx
-from info import ADMINS, MOVIE_UPDATE_CHANNEL, ABOVE_PREVIEW
+from plugins.Dreamxfutures.poster_generator import generate_movie_poster
+from info import ADMINS, MOVIE_UPDATE_CHANNEL, ABOVE_PREVIEW, GRP_LNK
 from utils import temp
+from pyrogram import enums
 
 #code is created by @bharath_boy for public use so atleast don't remove credits
 logger = logging.getLogger(__name__)
 
 post_sessions = {}
 
-USE_GETFILE_BUTTON_BY_DEFAULT = True
+USE_DEFAULT_BTN = True
+DEFAULT_BTN_LINK = GRP_LNK
 DEFAULT_WATERMARK = "Join [ᴅʀᴇᴀᴍxʙᴏᴛᴢ](https://t.me/dreamxbotz)"
 LANGUAGES_FORMAT = "➥ <b>Languages :</b> <code>{langs}</code>"
 RESOLUTIONS_FORMAT = "\n➥ <b>Qualities :</b> <code>{resolutions}</code>"
@@ -155,13 +158,17 @@ async def start_post_session(client: Client, message: Message, user_id: int, mov
         except Exception:
             pass
 
+    # Generate 1280x720 update poster buffer matching update posts poster
+    generated_poster = await generate_movie_poster(movie_details)
+
     post_sessions[user_id] = {
         "movie_name": movie_name, "caption": None, "buttons": [],
-        "photo_mode": False,
+        "photo_mode": True if generated_poster or movie_details.get("poster_url") or movie_details.get("backdrop_url") else False,
         "use_landscape": True if movie_details.get("backdrop_url") else False,
         "custom_languages": [], "custom_resolutions": [], "custom_otts": [],
         "last_preview_message_id": None, "original_message_id": message.id,
-        "custom_poster": None,
+        "custom_poster": generated_poster or movie_details.get("backdrop_url") or movie_details.get("poster_url"),
+        "generated_poster": generated_poster,
         "watermark": DEFAULT_WATERMARK,
         "lang_format": LANGUAGES_FORMAT,
         "ott_format": OTT_FORMAT,
@@ -169,15 +176,10 @@ async def start_post_session(client: Client, message: Message, user_id: int, mov
         "movie_details": movie_details
     }
 
-    if USE_GETFILE_BUTTON_BY_DEFAULT:
-        title = movie_details.get("title", "movie")
-        year = movie_details.get("year", "")
-        movie_year = f"{title} {year}".strip()
-        movie_year = re.sub(r"[ *:\.]", "-", movie_year)
-        url = f"https://telegram.me/{temp.U_NAME}?start=getfile-{movie_year}"
+    if USE_DEFAULT_BTN:
         post_sessions[user_id]["buttons"].append(
-            [InlineKeyboardButton("📥 Get Files 📥", url=url)])
-        logger.info(f"Default 'Get Files' button added for session {user_id}")
+            [InlineKeyboardButton("🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎", url=DEFAULT_BTN_LINK, style=enums.ButtonStyle.SUCCESS)])
+        logger.info(f"Default Search button added for session {user_id}")
 
     await update_post_preview(client, user_id, message.chat.id, force_resend=True)
 
@@ -426,7 +428,7 @@ async def handle_buttons_menu(query, session_id):
     buttons = [
         [InlineKeyboardButton(
             "➕ Add/Edit Layout", callback_data=f"post:edit_buttons:{session_id}")],
-        [InlineKeyboardButton("📥 Add 'Get Files' Button",
+        [InlineKeyboardButton("🔍 Add 'Search Here' Button",
                               callback_data=f"post:add_get_files:{session_id}")],
         [InlineKeyboardButton(
             "🗑️ Remove a Button", callback_data=f"post:remove_buttons_menu:{session_id}")],
@@ -448,14 +450,8 @@ async def handle_edit_buttons(client: Client, query: CallbackQuery, session: dic
 
 #code is created by @bharath_boy for public use so atleast don't remove credits
 async def handle_add_get_files(session):
-    movie_details = session["movie_details"]
-    if movie_details:
-        title = movie_details.get("title", "movie")
-        year = movie_details.get("year", "")
-        movie_year = f"{title} {year}".strip()
-        url = f"https://telegram.me/{temp.U_NAME}?start=getfile-{movie_year.replace(' ', '-')}"
-        session["buttons"].append(
-            [InlineKeyboardButton("📥 Get Files 📥", url=url)])
+    session["buttons"].append(
+        [InlineKeyboardButton("🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎", url=DEFAULT_BTN_LINK, style=enums.ButtonStyle.SUCCESS)])
 
 
 async def handle_edit_caption(client: Client, query: CallbackQuery, session: dict):

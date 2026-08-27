@@ -166,6 +166,8 @@ BUTTON_MODE = is_enabled((environ.get('BUTTON_MODE', "False")), False) # pm & Gr
 STREAM_MODE = is_enabled(environ.get('STREAM_MODE', "True"), True) # Set Stream mode True or False
 PREMIUM_STREAM_MODE = is_enabled(environ.get('PREMIUM_STREAM_MODE', "False"), False) # Set Stream mode True or False only for premium users
 MAINTENANCE = is_enabled(environ.get('MAINTENANCE', "False"), False)
+IS_FILE_LIMIT = is_enabled(environ.get('IS_FILE_LIMIT', "True"), True)
+FILES_LIMIT = int(environ.get('FILES_LIMIT', "8"))
 
 
 # ============================
