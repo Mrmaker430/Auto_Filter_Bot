@@ -86,6 +86,8 @@ async def pm_text(bot, message):
     content = message.text
     user = message.from_user.first_name
     user_id = message.from_user.id
+    if user_id in ADMINS:
+        return
     if EMOJI_MODE:
         try:
             await message.react(emoji=random.choice(REACTIONS), big=True)
@@ -865,6 +867,13 @@ async def cb_handler(client: Client, query: CallbackQuery):
 
     elif query.data.startswith("sendfiles"):
         ident, key = query.data.split("#")
+        bot_id = client.me.id
+        is_normal_user = (query.from_user.id not in ADMINS) and (not await db.has_premium_access(query.from_user.id))
+        limit_enabled = await db.is_file_limit_enabled(bot_id)
+
+        if is_normal_user and limit_enabled:
+            return await query.answer("⚠️ Normal users cannot use the Send All button. Please select files individually or upgrade to premium.", show_alert=True)
+
         settings = await get_settings(query.message.chat.id)
         try:
             await query.answer(url=f"https://telegram.me/{temp.U_NAME}?start=allfiles_{query.message.chat.id}_{key}")

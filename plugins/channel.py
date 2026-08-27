@@ -6,7 +6,7 @@ from collections import defaultdict
 from plugins.Dreamxfutures.Imdbposter import get_movie_detailsx, fetch_image, get_movie_details
 from database.users_chats_db import db
 from pyrogram import Client, filters, enums
-from info import CHANNELS, MOVIE_UPDATE_CHANNEL, LINK_PREVIEW, ABOVE_PREVIEW, BAD_WORDS, LANDSCAPE_POSTER, TMDB_POSTER
+from info import CHANNELS, MOVIE_UPDATE_CHANNEL, LINK_PREVIEW, ABOVE_PREVIEW, BAD_WORDS, LANDSCAPE_POSTER, TMDB_POSTER, GRP_LNK
 from Script import script
 from database.ia_filterdb import save_file
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -369,8 +369,9 @@ async def send_movie_update(bot, base_name):
             text = generate_movie_message(movie_doc, base_name)
             buttons = InlineKeyboardMarkup([[
                 InlineKeyboardButton(
-                    'ɢᴇᴛ ғɪʟᴇs',
-                    url=f"https://t.me/{temp.U_NAME}?start=getfile-{base_name.replace(' ', '-')}"
+                    '🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎',
+                    url=GRP_LNK,
+                    style=enums.ButtonStyle.SUCCESS
                 )
             ]])
             size=(2560, 1440) if LANDSCAPE_POSTER and TMDB_POSTER and movie_doc.get("is_backdrop") and not movie_doc.get("error_tmdb") else (853, 1280)
@@ -428,8 +429,9 @@ async def update_movie_message(bot, base_name):
         text = generate_movie_message(movie_doc, base_name)
         buttons = InlineKeyboardMarkup([[
             InlineKeyboardButton(
-                'ɢᴇᴛ ғɪʟᴇs',
-                url=f"https://t.me/{temp.U_NAME}?start=getfile-{base_name.replace(' ', '-')}"
+                '🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎',
+                url=GRP_LNK,
+                style=enums.ButtonStyle.SUCCESS
             )
         ]])
 

@@ -336,7 +336,13 @@ async def start(client, message):
         # Now, await the file details task
         files_ = await file_details_task
 
+        bot_id = client.me.id
+        is_normal_user = (message.from_user.id not in ADMINS) and (not await db.has_premium_access(message.from_user.id))
+        limit_enabled = await db.is_file_limit_enabled(bot_id)
+
         if data.startswith("allfiles"):
+            if is_normal_user and limit_enabled:
+                return await message.reply('<b><i>⚠️ Normal users cannot use the Send All button. Please select files individually or upgrade to premium.</i></b>')
             try:
                 files = temp.GETALL.get(file_id)
                 if not files:
@@ -382,6 +388,22 @@ async def start(client, message):
                 logger.exception(e)
                 return
 
+        if is_normal_user and limit_enabled:
+            current_count = await db.get_user_file_count(message.from_user.id)
+            max_limit = await db.get_file_limit(bot_id)
+            if current_count >= max_limit:
+                btn = InlineKeyboardMarkup([[InlineKeyboardButton("⭐ Buy Premium ⭐", callback_data="premium_info")]])
+                return await message.reply(
+                    f"<b>❌ Daily Free File Limit Reached!</b>\n\n"
+                    f"📊 ʏᴏᴜ ʜᴀᴠᴇ ʀᴇᴄᴇɪᴠᴇᴅ {current_count}/{max_limit} ꜰʀᴇᴇ ꜰɪʟᴇꜱ ᴛᴏᴅᴀʏ.\n"
+                    f"Please wait until tomorrow or upgrade to premium for unlimited access.",
+                    reply_markup=btn
+                )
+            new_count = await db.increment_user_file_count(message.from_user.id)
+            quota_txt = f"\n\n📊 ʏᴏᴜ ʜᴀᴠᴇ ʀᴇᴄᴇɪᴠᴇᴅ {new_count}/{max_limit} ꜰʀᴇᴇ ꜰɪʟᴇꜱ ᴛᴏᴅᴀʏ."
+        else:
+            quota_txt = ""
+
         settings = await get_settings(int(grp_id))
         if not files_:
             raw = base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))
@@ -414,6 +436,7 @@ async def start(client, message):
                         f_caption=DREAMX_CAPTION.format(file_name= '' if title is None else title, file_size='' if size is None else size, file_caption='')
                     except Exception:
                         return
+                f_caption += quota_txt
                 await msg.edit_caption(
                     f_caption,
                     reply_markup=InlineKeyboardMarkup(btn)
@@ -447,6 +470,7 @@ async def start(client, message):
 
         if f_caption is None:
             f_caption = clean_filename(files.file_name)
+        f_caption += quota_txt
         btn = await stream_buttons(message.from_user.id, file_id)
         msg = await client.send_cached_media(
             chat_id=message.from_user.id,
@@ -990,6 +1014,51 @@ async def set_movie_update_notification(client, message):
     except Exception as e:
         logger.error(f"Error in set_movie_update_notification: {e}")
         await message.reply_text(f"<b>❗ An error occurred: {e}</b>")
+
+@Client.on_message(filters.private & filters.command("file_limit") & filters.user(ADMINS))
+async def set_file_limit_cmd(client, message):
+    bot_id = client.me.id
+    cmd_parts = message.text.split(maxsplit=1)
+    if len(cmd_parts) == 1:
+        enabled = await db.is_file_limit_enabled(bot_id)
+        limit = await db.get_file_limit(bot_id)
+        status_str = "ENABLED ✅" if enabled else "DISABLED ❌"
+        return await message.reply_text(
+            f"<b>📊 File Limit System Settings:</b>\n\n"
+            f"• <b>Status:</b> {status_str}\n"
+            f"• <b>Current Limit:</b> <code>{limit}</code> files/day\n\n"
+            f"<b>Usage:</b>\n"
+            f"• `/file_limit on` / `/file_limit off`\n"
+            f"• `/file_limit 8` (Set limit)\n"
+            f"• `/file_limit +2` / `/file_limit -2` (Increase/Decrease limit)"
+        )
+
+    arg = cmd_parts[1].strip().lower()
+    if arg in ["on", "true", "enable"]:
+        await db.update_file_limit_status(bot_id, True)
+        return await message.reply_text("<b>FILE LIMIT SYSTEM ENABLED ✅</b>")
+    elif arg in ["off", "false", "disable"]:
+        await db.update_file_limit_status(bot_id, False)
+        return await message.reply_text("<b>FILE LIMIT SYSTEM DISABLED ❌</b>")
+
+    if arg.startswith("+") or arg.startswith("-"):
+        try:
+            delta = int(arg)
+            curr_limit = await db.get_file_limit(bot_id)
+            new_limit = max(1, curr_limit + delta)
+            await db.update_file_limit(bot_id, new_limit)
+            return await message.reply_text(f"<b>✅ File limit updated from {curr_limit} to {new_limit} files/day.</b>")
+        except ValueError:
+            return await message.reply_text("<b>💔 Invalid number format. Example: `/file_limit +2` or `/file_limit -2`</b>")
+
+    try:
+        new_limit = int(arg)
+        if new_limit < 1:
+            return await message.reply_text("<b>💔 Limit must be at least 1.</b>")
+        await db.update_file_limit(bot_id, new_limit)
+        await message.reply_text(f"<b>✅ File limit set to {new_limit} files/day.</b>")
+    except ValueError:
+        await message.reply_text("<b>💔 Invalid command argument. Use `/file_limit` for help.</b>")
 
 @Client.on_message(filters.command("restart") & filters.user(ADMINS))
 async def stop_button(bot, message):
