@@ -189,6 +189,12 @@ async def _build_final_post_content(session: dict, session_id: int):
     if not movie_details:
         return None, None, None
 
+    if not session.get("generated_poster"):
+        session["generated_poster"] = await generate_movie_poster(movie_details)
+        if session["generated_poster"] and not session.get("custom_poster"):
+            session["custom_poster"] = session["generated_poster"]
+            session["photo_mode"] = True
+
     if not session.get("caption"):
         session["caption"] = TEMPLATES[session["active_template"]].format(
             title=movie_details.get("title", "N/A"), year=movie_details.get("year", "N/A"),
@@ -212,9 +218,8 @@ async def _build_final_post_content(session: dict, session_id: int):
         final_caption += f"\n\n{session['watermark']}"
 
     keyboard = build_keyboard(session, session_id)
-    poster_to_use = session.get("custom_poster") or \
-        (movie_details.get("backdrop_url") if session.get(
-            "use_landscape") else movie_details.get("poster_url"))
+    poster_to_use = session.get("custom_poster") or session.get("generated_poster") or \
+        movie_details.get("poster_url")
 
     return final_caption, keyboard, poster_to_use
 
@@ -561,6 +566,10 @@ async def handle_toggle_preview(query: CallbackQuery, session: dict):
 
 async def handle_toggle_poster(session):
     session["use_landscape"] = not session["use_landscape"]
+    if session["use_landscape"]:
+        session["custom_poster"] = session.get("generated_poster") or session.get("movie_details", {}).get("poster_url")
+    else:
+        session["custom_poster"] = session.get("movie_details", {}).get("poster_url")
     return True
 
 

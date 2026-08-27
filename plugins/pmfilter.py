@@ -1689,10 +1689,7 @@ async def auto_filter(client, msg, spoll=False):
         try:
             if imdb and imdb.get('poster'):
                 try:
-                    if TMDB_POSTER:
-                        photo = imdb.get('backdrop') if imdb.get('backdrop') and LANDSCAPE_POSTER else imdb.get('poster')
-                    else:
-                        photo = imdb.get('poster')
+                    photo = imdb.get('poster')
                     sent = await message.reply_photo(photo=photo, caption=cap, reply_markup=InlineKeyboardMarkup(btn), parse_mode=enums.ParseMode.HTML)
                     if m:
                         await m.delete()
