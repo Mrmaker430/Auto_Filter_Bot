@@ -32,6 +32,7 @@ class Database:
         self.movie_updates = self.db.movie_updates
         self.connection = self.db.connections
         self.file_limits = self.db.file_limits
+        self.pinterest_limits = self.db.pinterest_limits
 
     async def add_name(self, filename):
         if await self.movie_updates.find_one({'_id': filename}):
@@ -472,6 +473,23 @@ class Database:
         ist = pytz.timezone('Asia/Kolkata')
         today = datetime.datetime.now(ist).strftime("%Y-%m-%d")
         res = await self.file_limits.find_one_and_update(
+            {"user_id": user_id, "date": today},
+            {"$inc": {"count": 1}},
+            upsert=True,
+            return_document=ReturnDocument.AFTER
+        )
+        return res["count"] if res else 1
+
+    async def get_pinterest_search_count(self, user_id: int) -> int:
+        ist = pytz.timezone('Asia/Kolkata')
+        today = datetime.datetime.now(ist).strftime("%Y-%m-%d")
+        doc = await self.pinterest_limits.find_one({"user_id": user_id, "date": today})
+        return doc["count"] if doc else 0
+
+    async def increment_pinterest_search_count(self, user_id: int) -> int:
+        ist = pytz.timezone('Asia/Kolkata')
+        today = datetime.datetime.now(ist).strftime("%Y-%m-%d")
+        res = await self.pinterest_limits.find_one_and_update(
             {"user_id": user_id, "date": today},
             {"$inc": {"count": 1}},
             upsert=True,
