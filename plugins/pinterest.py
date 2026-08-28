@@ -1,16 +1,26 @@
+import asyncio
 import logging
 import random
 import aiohttp
 from pyrogram import Client, filters, enums
 from pyrogram.types import InputMediaPhoto, InlineKeyboardButton, InlineKeyboardMarkup
-from info import AUTH_CHANNELS, AUTH_REQ_CHANNELS, FSUB_PICS, PINTEREST_LOG_CHANNEL
+from info import ADMINS, AUTH_CHANNELS, AUTH_REQ_CHANNELS, FSUB_PICS, PINTEREST_LOG_CHANNEL
 from utils import is_subscribed, is_req_subscribed
+from database.users_chats_db import db
 from Script import script
 
 logger = logging.getLogger(__name__)
 
 # --- PINTEREST PAGINATION SESSION STORE ---
 pinterest_sessions = {}  # user_id -> {'images': [...], 'page': 0, 'query': str, 'last_media_msg_ids': [...], 'last_pagination_msg_id': int}
+
+async def auto_delete_pinterest_messages(client, chat_id, message_ids, delay=600):
+    """Auto-deletes specified message IDs after delay (default 10 minutes)."""
+    await asyncio.sleep(delay)
+    try:
+        await client.delete_messages(chat_id, message_ids)
+    except Exception as e:
+        logger.error(f"Auto-delete pinterest messages error: {e}")
 
 # --- PINTEREST SEARCH FUNCTION ---
 async def fetch_pinterest_images(query, count=50):
@@ -75,6 +85,21 @@ async def pinterest_command(client, message):
         await message.reply_text("⚠️ Query cannot be empty.")
         return
 
+    # Check daily search limit for non-premium users
+    is_premium = (user_id in ADMINS) or (await db.has_premium_access(user_id))
+    if not is_premium:
+        search_count = await db.get_pinterest_search_count(user_id)
+        if search_count >= 3:
+            btn = InlineKeyboardMarkup([[InlineKeyboardButton("⭐ Upgrade to Premium ⭐", callback_data="premium_info")]])
+            await message.reply_text(
+                "<b>⚠️ Daily Pinterest Search Limit Reached!</b>\n\n"
+                "Normal users can perform up to <b>3 searches per day</b>.\n"
+                "Upgrade to premium for unlimited Pinterest searches!",
+                reply_markup=btn,
+                parse_mode=enums.ParseMode.HTML
+            )
+            return
+
     # Show searching message
     status_msg = await message.reply_text(
         f"🔍 Searching Pinterest for: <b>{query}</b>...",
@@ -86,6 +111,9 @@ async def pinterest_command(client, message):
     if not images:
         await status_msg.edit_text("❌ No results found or API error.")
         return
+
+    if not is_premium:
+        await db.increment_pinterest_search_count(user_id)
 
     # Log user ID and images search to PINTEREST_LOG_CHANNEL (2nd log variable)
     try:
@@ -102,6 +130,13 @@ async def pinterest_command(client, message):
             text=log_text,
             parse_mode=enums.ParseMode.HTML
         )
+        # Save search media group to log channel
+        log_media = [
+            InputMediaPhoto(img['image'], caption=f"📌 <b>{img['title']}</b>" if i == 0 else "", parse_mode=enums.ParseMode.HTML)
+            for i, img in enumerate(images[:8])
+        ]
+        if log_media:
+            await client.send_media_group(PINTEREST_LOG_CHANNEL, log_media)
     except Exception as e:
         logger.error(f"Failed to send Pinterest log: {e}")
 
@@ -177,6 +212,10 @@ async def send_pinterest_page(client, chat_id, user_id):
         parse_mode=enums.ParseMode.HTML
     )
     session['last_pagination_msg_id'] = pagination_msg.id
+
+    # Auto delete media group and pagination message after 10 minutes (600s)
+    msg_ids_to_delete = session['last_media_msg_ids'] + [pagination_msg.id]
+    asyncio.create_task(auto_delete_pinterest_messages(client, chat_id, msg_ids_to_delete, delay=600))
 
 # --- CALLBACK HANDLER FOR PINTEREST PAGINATION ---
 @Client.on_callback_query(filters.regex(r"^pin_"))
