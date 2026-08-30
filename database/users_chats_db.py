@@ -480,6 +480,11 @@ class Database:
         )
         return res["count"] if res else 1
 
+    async def reset_user_limit(self, user_id: int) -> bool:
+        res1 = await self.file_limits.delete_many({"user_id": user_id})
+        res2 = await self.pinterest_limits.delete_many({"user_id": user_id})
+        return bool(res1.deleted_count > 0 or res2.deleted_count > 0)
+
     async def get_pinterest_search_count(self, user_id: int) -> int:
         ist = pytz.timezone('Asia/Kolkata')
         today = datetime.datetime.now(ist).strftime("%Y-%m-%d")

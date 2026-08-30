@@ -264,6 +264,8 @@ Bot_cmds = {
     "trial_reset": "User Trial Reset",
     "remove_fsub": "Remove Forced Subscription (group admin only)",
     "maintenance": "Maintenance Mode (Admin Only)",
+    "check_limit": "Cʜᴇᴄᴋ ᴀ ᴜsᴇʀ ʟɪᴍɪᴛ",
+    "reset_limit": "Rᴇsᴇᴛ ᴀ ᴜsᴇʀ's ʟɪᴍɪᴛ",
 }
 
 

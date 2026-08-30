@@ -1552,3 +1552,77 @@ async def clean_groups_handler(client, message):
         except Exception as e:
             logger.error("Error in clean_groups loop: %s", e)
     await msg.edit(f'**Clean Groups Complete**\n\nTotal Processed: {processed}\nDeleted: {deleted_count}')
+
+
+@Client.on_message(filters.command("check_limit"))
+async def check_limit_cmd(client, message):
+    user_id = None
+    if len(message.command) > 1:
+        try:
+            user_id = int(message.command[1])
+        except ValueError:
+            return await message.reply_text("<b>💔 Invalid User ID. Usage: `/check_limit <user_id>`</b>")
+    elif message.reply_to_message and message.reply_to_message.from_user:
+        user_id = message.reply_to_message.from_user.id
+    else:
+        user_id = message.from_user.id if message.from_user else None
+
+    if not user_id:
+        return await message.reply_text("<b>💔 Unable to determine User ID.</b>")
+
+    try:
+        user = await client.get_users(user_id)
+        user_mention = user.mention
+    except Exception:
+        user_mention = f"<code>{user_id}</code>"
+
+    bot_id = client.me.id
+    is_premium = await db.has_premium_access(user_id)
+    limit_enabled = await db.is_file_limit_enabled(bot_id)
+    max_file_limit = await db.get_file_limit(bot_id)
+    user_file_count = await db.get_user_file_count(user_id)
+    user_pinterest_count = await db.get_pinterest_search_count(user_id)
+
+    status_str = "Unlimited ⚡ (Premium User)" if is_premium else ("Disabled ❌" if not limit_enabled else "Enabled ✅")
+
+    if is_premium or not limit_enabled:
+        remaining_files = "Unlimited ⚡"
+    else:
+        rem = max(0, max_file_limit - user_file_count)
+        remaining_files = f"{rem} file(s)"
+
+    caption = (
+        f"<b>📊 User Limitation Info:</b>\n\n"
+        f"👤 <b>User:</b> {user_mention}\n"
+        f"⚡ <b>User ID:</b> <code>{user_id}</code>\n"
+        f"💎 <b>Premium Status:</b> {'Yes ✅' if is_premium else 'No ❌'}\n"
+        f"⚙️ <b>File Limit System:</b> {status_str}\n"
+        f"📁 <b>Daily Files Used:</b> <code>{user_file_count}</code> / <code>{max_file_limit if limit_enabled and not is_premium else 'Unlimited'}</code>\n"
+        f"⏳ <b>Remaining Files Today:</b> <code>{remaining_files}</code>\n"
+        f"📌 <b>Pinterest Searches Today:</b> <code>{user_pinterest_count}</code> / <code>{'Unlimited' if is_premium or (user_id in ADMINS) else 3}</code>"
+    )
+    await message.reply_text(caption)
+
+
+@Client.on_message(filters.command("reset_limit") & filters.user(ADMINS))
+async def reset_limit_cmd(client, message):
+    user_id = None
+    if len(message.command) > 1:
+        try:
+            user_id = int(message.command[1])
+        except ValueError:
+            return await message.reply_text("<b>💔 Invalid User ID format. Usage: `/reset_limit <user_id>`</b>")
+    elif message.reply_to_message and message.reply_to_message.from_user:
+        user_id = message.reply_to_message.from_user.id
+
+    if not user_id:
+        return await message.reply_text("<b>📌 Usage: `/reset_limit user_id` or reply to a user's message with `/reset_limit`</b>")
+
+    try:
+        user = await client.get_users(user_id)
+        user_mention = user.mention
+    except Exception:
+        user_mention = f"<code>{user_id}</code>"
+
+    await db.reset_user_limit(user_id)
+    await message.reply_text(f"<b>✅ Successfully reset daily limitation for user {user_mention} (<code>{user_id}</code>).</b>")
