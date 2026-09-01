@@ -13,6 +13,7 @@ telegraph
 pymediainfo-pyrofork
 
 # Other tools
+yt-dlp
 Pillow
 psutil
 aiofiles
