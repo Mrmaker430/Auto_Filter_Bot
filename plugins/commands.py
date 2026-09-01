@@ -839,6 +839,43 @@ async def send_msg(bot, message):
     else:
         await message.reply_text("<b>ᴜꜱᴇ ᴛʜɪꜱ ᴄᴏᴍᴍᴀɴᴅ ᴀꜱ ᴀ ʀᴇᴘʟʏ ᴛᴏ ᴀɴʏ ᴍᴇꜱꜱᴀɢᴇ ᴜꜱɪɴɢ ᴛʜᴇ ᴛᴀʀɢᴇᴛ ᴄʜᴀᴛ ɪᴅ. ꜰᴏʀ ᴇɢ:  /send ᴜꜱᴇʀɪᴅ</b>")
 
+@Client.on_message(filters.command(["msg", "message"]) & filters.user(ADMINS))
+async def send_personal_msg(bot, message):
+    if len(message.command) < 2:
+        return await message.reply_text(
+            "<b>Usage:</b>\n"
+            "• <code>/msg <userid> <message></code>\n"
+            "• Reply to any message with <code>/msg <userid></code>"
+        )
+
+    target_id_str = message.command[1]
+    try:
+        target_id = int(target_id_str)
+    except ValueError:
+        return await message.reply_text("<b>❌ Invalid User ID format. User ID must be an integer.</b>")
+
+    try:
+        user = await bot.get_users(target_id)
+        user_mention = user.mention
+    except Exception:
+        user_mention = f"<code>{target_id}</code>"
+
+    if len(message.command) > 2:
+        msg_text = message.text.split(" ", 2)[2]
+        try:
+            await bot.send_message(chat_id=target_id, text=msg_text)
+            await message.reply_text(f"<b>✅ Message successfully sent to {user_mention}.</b>")
+        except Exception as e:
+            await message.reply_text(f"<b>❌ Failed to send message to {user_mention}.\n\nError:</b> <code>{e}</code>")
+    elif message.reply_to_message:
+        try:
+            await message.reply_to_message.copy(chat_id=target_id)
+            await message.reply_text(f"<b>✅ Message successfully sent to {user_mention}.</b>")
+        except Exception as e:
+            await message.reply_text(f"<b>❌ Failed to send message to {user_mention}.\n\nError:</b> <code>{e}</code>")
+    else:
+        await message.reply_text("<b>❌ Please provide a message or reply to a message to send.</b>\n\n<b>Usage:</b> <code>/msg <userid> <message></code>")
+
 @Client.on_message(filters.command("deletefiles") & filters.user(ADMINS))
 async def deletemultiplefiles(bot, message):
     chat_type = message.chat.type
