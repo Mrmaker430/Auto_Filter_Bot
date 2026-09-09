@@ -73,10 +73,11 @@ class Database:
             ),
         )
 
-    def new_group(self, id, title):
+    def new_group(self, id, title, user_id=None):
         return dict(
             id = id,
             title = title,
+            user_id = user_id,
             chat_status=dict(
                 is_disabled=False,
                 reason="",
@@ -135,8 +136,8 @@ class Database:
         b_users = [user['id'] async for user in users]
         return b_users, b_chats
     
-    async def add_chat(self, chat, title):
-        chat = self.new_group(chat, title)
+    async def add_chat(self, chat, title, user_id=None):
+        chat = self.new_group(chat, title, user_id)
         await self.grp.insert_one(chat)
     
     async def get_chat(self, chat):
