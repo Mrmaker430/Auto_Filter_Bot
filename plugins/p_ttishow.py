@@ -26,8 +26,9 @@ async def save_group(bot, message):
         if not await db.get_chat(message.chat.id):
             total=await bot.get_chat_members_count(message.chat.id)
             dreamx_botz = message.from_user.mention if message.from_user else "Anonymous" 
+            user_id = message.from_user.id if message.from_user else None
             await bot.send_message(LOG_CHANNEL, script.LOG_TEXT_G.format(message.chat.title, message.chat.id, total, dreamx_botz))       
-            await db.add_chat(message.chat.id, message.chat.title)
+            await db.add_chat(message.chat.id, message.chat.title, user_id=user_id)
         if message.chat.id in temp.BANNED_CHATS:
 
             buttons = [[InlineKeyboardButton('📌 ᴄᴏɴᴛᴀᴄᴛ ꜱᴜᴘᴘᴏʀᴛ 📌', url=OWNER_LNK)]]
@@ -318,19 +319,43 @@ async def list_users(bot, message):
         if os.path.exists('users.txt'):
             os.remove('users.txt')
 
-@Client.on_message(filters.command('chats') & filters.user(ADMINS))
+async def get_chat_link(bot, chat_id):
+    try:
+        chat = await bot.get_chat(int(chat_id))
+        if getattr(chat, 'username', None):
+            return f"https://t.me/{chat.username}"
+        if getattr(chat, 'invite_link', None):
+            return chat.invite_link
+        return await bot.export_chat_invite_link(int(chat_id))
+    except Exception:
+        try:
+            return await bot.export_chat_invite_link(int(chat_id))
+        except Exception:
+            return "N/A"
+
+@Client.on_message(filters.command(['chats', 'chat']) & filters.user(ADMINS))
 async def list_chats(bot, message):
     dreamxbotz = await message.reply('Getting List Of chats')
     chats = db.get_all_chats()
     out = "Chats Saved In DB Are:\n\n"
     async for chat in chats:
         title = chat.get('title', '')
-        out += f"**Title:** `{title}`\n**- ID:** `{chat['id']}`"
+        chat_id = chat['id']
+        user_id = chat.get('user_id') or chat.get('by')
+        if not user_id:
+            conn = await db.connection.find_one({'group_ids': chat_id})
+            if conn:
+                user_id = conn.get('_id')
+        user_id_str = f"`{user_id}`" if user_id else "`N/A`"
+
+        link = await get_chat_link(bot, chat_id)
+
+        out += f"**Title:** `{title}`\n**- ID:** `{chat_id}`\n**- Link:** {link}\n**- User ID:** {user_id_str}"
         if chat.get('chat_status', {}).get('is_disabled'):
             out += ' ( Disabled Chat )'
-        out += '\n'
+        out += '\n\n'
     try:
-        await dreamxbotz.edit_text(out)
+        await dreamxbotz.edit_text(out, disable_web_page_preview=True)
     except (MessageTooLong, Exception) as e:
         logger.warning(f"Failed to edit text in list_chats, sending doc instead: {e}")
         with open('chats.txt', 'w+', encoding='utf-8') as outfile:
