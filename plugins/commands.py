@@ -25,7 +25,7 @@ from info import (
     LOG_CHANNEL, SHORTENER_API, SHORTENER_API2, SHORTENER_API3, SHORTENER_WEBSITE, SHORTENER_WEBSITE2, SHORTENER_WEBSITE3,
     
 )
-from utils import get_settings, save_group_settings, is_subscribed, is_req_subscribed, get_size, get_shortlink, is_check_admin, temp, get_readable_time, get_time, generate_settings_text, log_error, clean_filename, get_random_mix_id
+from utils import get_settings, save_group_settings, is_subscribed, is_req_subscribed, get_size, get_shortlink, is_check_admin, temp, get_readable_time, get_time, generate_settings_text, log_error, clean_filename, get_random_mix_id, get_or_generate_cover
 
 logger = logging.getLogger(__name__)
 
@@ -356,7 +356,7 @@ async def start(client, message):
                     files_ = await get_file_details(file_id)
                     files1 = files_[0]
                     title = clean_filename(files1.file_name)
-                    cover = files1.cover
+                    cover = await get_or_generate_cover(files1.file_name, files1.cover)
                     size = get_size(files1.file_size)
                     f_caption = files1.caption
                     settings = await get_settings(int(grp_id))
@@ -417,7 +417,9 @@ async def start(client, message):
                 cover = None
                 if COVERX:
                     details = await get_file_details(file_id)
-                    cover = details[0].cover if details and details[0].cover else None
+                    old_cover = details[0].cover if details and details[0].cover else None
+                    fname = details[0].file_name if details and details[0].file_name else ""
+                    cover = await get_or_generate_cover(fname, old_cover)
                 btn = await stream_buttons(message.from_user.id, file_id)
                 msg = await client.send_cached_media(
                     chat_id=message.from_user.id,
@@ -459,7 +461,8 @@ async def start(client, message):
         files = files_[0]
         title = clean_filename(files.file_name)
         size = get_size(files.file_size)
-        cover = files.cover if files.cover else None
+        old_cover = files.cover if files.cover else None
+        cover = await get_or_generate_cover(files.file_name, old_cover)
         f_caption = files.caption
         settings = await get_settings(int(grp_id))            
         DREAMX_CAPTION = settings.get('caption', CUSTOM_FILE_CAPTION)

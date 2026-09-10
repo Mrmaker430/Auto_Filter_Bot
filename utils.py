@@ -1,15 +1,16 @@
+import io
 import logging
 import re
 import os
 import random
 import string
-from info import ULTRA_FAST_MODE, MAX_LIST_ELM, BAD_WORDS, LONG_IMDB_DESCRIPTION, IS_VERIFY, MAX_B_TN, TUTORIAL, TUTORIAL_2, TUTORIAL_3, LOG_CHANNEL, TMDB_ON_SEARCH
+from info import ULTRA_FAST_MODE, MAX_LIST_ELM, BAD_WORDS, LONG_IMDB_DESCRIPTION, IS_VERIFY, MAX_B_TN, TUTORIAL, TUTORIAL_2, TUTORIAL_3, LOG_CHANNEL, TMDB_ON_SEARCH, COVERX
 from imdbkit import IMDBKit # pyrefly: ignore 
 import asyncio
 from pyrogram.types import Message, InlineKeyboardButton
 from pyrogram.errors import InputUserDeactivated, UserNotParticipant, FloodWait, UserIsBlocked, PeerIdInvalid, ChatAdminRequired
 from pyrogram import enums
-from typing import Union
+from typing import Union, Optional
 from Script import script
 from typing import List
 from database.users_chats_db import db
@@ -1118,3 +1119,103 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
     except Exception as e:
         logger.error(f"Error in get_cap: {e}")
         pass
+
+POSTER_CACHE = {}
+MAX_POSTER_CACHE_SIZE = 100
+
+async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = None) -> Union[io.BytesIO, str, None]:
+    if not COVERX:
+        return fallback_cover
+    if not file_name:
+        return fallback_cover
+
+    try:
+        from database.ia_filterdb import dreamxbotz_clean_title
+        clean_title = await dreamxbotz_clean_title(file_name)
+    except Exception:
+        clean_title = clean_filename(file_name)
+
+    if not clean_title:
+        return fallback_cover
+
+    cache_key = clean_title.strip().lower()
+
+    if cache_key in POSTER_CACHE:
+        cached = POSTER_CACHE[cache_key]
+        if isinstance(cached, bytes):
+            buf = io.BytesIO(cached)
+            buf.seek(0)
+            return buf
+        return cached if cached else fallback_cover
+
+    try:
+        from plugins.Dreamxfutures.Imdbposter import get_movie_detailsx, get_movie_details
+        from plugins.Dreamxfutures.poster_generator import generate_movie_poster
+        from info import TMDB_POSTER
+
+        movie_doc = None
+        if hasattr(db, 'movie_updates') and db.movie_updates is not None:
+            try:
+                movie_doc = await db.movie_updates.find_one({"_id": clean_title})
+            except Exception:
+                movie_doc = None
+
+        details = None
+        if movie_doc:
+            details = {
+                "title": movie_doc.get("title") or clean_title,
+                "rating": movie_doc.get("rating", "N/A"),
+                "year": movie_doc.get("year", ""),
+                "tag": movie_doc.get("tag", "#MOVIE"),
+                "genres": movie_doc.get("genres", "N/A"),
+                "plot": movie_doc.get("plot", ""),
+                "poster_url": movie_doc.get("poster_url"),
+                "backdrop_url": movie_doc.get("backdrop_url") or movie_doc.get("poster_url"),
+                "logo_url": movie_doc.get("logo_url"),
+            }
+        else:
+            try:
+                if TMDB_POSTER:
+                    details = await asyncio.wait_for(get_movie_detailsx(clean_title), timeout=3.5)
+                    if not details or details.get("error") or (not details.get("poster_url") and not details.get("backdrop_url")):
+                        details = await asyncio.wait_for(get_movie_details(clean_title), timeout=3.5) or {}
+                else:
+                    details = await asyncio.wait_for(get_movie_details(clean_title), timeout=3.5) or {}
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout fetching details for cover of '{clean_title}'")
+                details = None
+
+        if details and (details.get("poster_url") or details.get("backdrop_url")):
+            poster_details = {
+                "title": details.get("title") or clean_title,
+                "rating": details.get("rating", "N/A"),
+                "year": details.get("year", ""),
+                "tag": details.get("tag", "#MOVIE"),
+                "genres": details.get("genres", "N/A"),
+                "plot": details.get("plot", ""),
+                "poster_url": details.get("poster_url"),
+                "backdrop_url": details.get("backdrop_url") or details.get("poster_url"),
+                "logo_url": details.get("logo_url"),
+            }
+            generated_poster = await generate_movie_poster(poster_details)
+            if generated_poster:
+                poster_bytes = generated_poster.getvalue()
+                if len(POSTER_CACHE) >= MAX_POSTER_CACHE_SIZE:
+                    POSTER_CACHE.pop(next(iter(POSTER_CACHE)))
+                POSTER_CACHE[cache_key] = poster_bytes
+                buf = io.BytesIO(poster_bytes)
+                buf.seek(0)
+                return buf
+            elif details.get("poster_url"):
+                if len(POSTER_CACHE) >= MAX_POSTER_CACHE_SIZE:
+                    POSTER_CACHE.pop(next(iter(POSTER_CACHE)))
+                POSTER_CACHE[cache_key] = details["poster_url"]
+                return details["poster_url"]
+
+    except Exception as e:
+        logger.warning(f"Error generating cover for '{file_name}': {e}")
+
+    if len(POSTER_CACHE) >= MAX_POSTER_CACHE_SIZE:
+        POSTER_CACHE.pop(next(iter(POSTER_CACHE)))
+    POSTER_CACHE[cache_key] = fallback_cover
+    return fallback_cover
