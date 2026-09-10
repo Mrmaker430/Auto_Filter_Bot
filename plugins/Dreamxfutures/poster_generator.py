@@ -46,6 +46,39 @@ def _get_font(path: str, size: int):
 def _draw_rounded_rectangle(draw: ImageDraw.ImageDraw, xy, radius, fill=None, outline=None, width=1):
     draw.rounded_rectangle(xy, radius=radius, fill=fill, outline=outline, width=width)
 
+def _draw_telegram_watermark_badge(draw: ImageDraw.ImageDraw, x: int, y: int, username: str, font: ImageFont.ImageFont) -> int:
+    wm_text = username if username.startswith("@") else f"@{username.lstrip('@')}"
+    bbox = font.getbbox(wm_text)
+    text_w = bbox[2] - bbox[0]
+
+    padding_right = 10
+    circle_radius = 10
+    circle_margin = 4
+    badge_w = circle_margin + (circle_radius * 2) + 6 + text_w + padding_right
+
+    # Dark rounded pill background (matching Screenshot_2026_0910_151234.png)
+    _draw_rounded_rectangle(draw, (x, y - 2, x + badge_w, y + 24), radius=13, fill=(35, 35, 40, 245))
+
+    # Blue Telegram circle
+    circle_cx = x + circle_margin + circle_radius
+    circle_cy = y + 11
+    draw.ellipse(
+        (circle_cx - circle_radius, circle_cy - circle_radius, circle_cx + circle_radius, circle_cy + circle_radius),
+        fill=(40, 168, 233, 255)
+    )
+
+    # Paper plane icon inside blue circle
+    wing1 = [(circle_cx + 5, circle_cy - 5), (circle_cx - 5, circle_cy - 1), (circle_cx, circle_cy + 1)]
+    wing2 = [(circle_cx + 5, circle_cy - 5), (circle_cx, circle_cy + 1), (circle_cx - 1, circle_cy + 5)]
+    draw.polygon(wing1, fill=(255, 255, 255, 255))
+    draw.polygon(wing2, fill=(215, 235, 250, 255))
+
+    # Username text inside pill
+    text_x = circle_cx + circle_radius + 6
+    draw.text((text_x, y + 11), wm_text, font=font, fill=(255, 255, 255, 255), anchor="lm")
+
+    return badge_w
+
 def _wrap_text(text: str, font: ImageFont.ImageFont, max_width: int, max_lines: int = 3) -> list[str]:
     words = text.split()
     lines = []
@@ -167,18 +200,9 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         font_badge = _get_font(SANS_BOLD_FONT_PATH, 15)
         font_plot = _get_font(SANS_FONT_PATH, 18)
 
-        # 3. Top Right Corner Watermark Text
-        wm_text = channel_username if channel_username.startswith("@") else f"@{channel_username.lstrip('@')}"
-        draw.text((width - 45, 30), wm_text, font=font_watermark, fill=(255, 255, 255, 200), anchor="rt")
+        # 3. Top Right Corner Watermark Text (Removed per request - moved to badges row)
 
-        # 4. Top Left Title Area (e.g., Localized Title or Secondary Title)
-        top_title = str(details.get("localized_title") or details.get("title") or "").upper().strip()
-        top_title_x = 65
-        top_title_y = 330
-        if top_title:
-            # Draw text shadow
-            draw.text((top_title_x + 2, top_title_y + 2), top_title, font=font_top_title, fill=(0, 0, 0, 180), anchor="ls")
-            draw.text((top_title_x, top_title_y), top_title, font=font_top_title, fill=(230, 235, 240, 255), anchor="ls")
+        # 4. Top Left Title Area (Removed per request - title above mini poster removed)
 
         # 5. Bottom Left Portrait Poster Card
         card_x, card_y = 65, 365
@@ -271,12 +295,17 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         for idx, g in enumerate(genres_list[:2]):
             g_text = str(g).upper()
             g_w = font_badge.getbbox(g_text)[2] + 24
-            if curr_badge_x + g_w > width - 30:
+            if curr_badge_x + g_w > width - 200:
                 break
             bg_col = badge_colors[idx % len(badge_colors)]
             _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 2, curr_badge_x + g_w, row_y + 24), radius=10, fill=bg_col)
             draw.text((curr_badge_x + g_w // 2, row_y + 11), g_text, font=font_badge, fill=(255, 255, 255, 255), anchor="mm")
             curr_badge_x += g_w + 10
+
+        # Watermark Pill Badge (Placed besides the genres)
+        if channel_username:
+            wm_badge_w = _draw_telegram_watermark_badge(draw, curr_badge_x, row_y, channel_username, font_badge)
+            curr_badge_x += wm_badge_w + 10
 
         # 8. Plot Description Area
         plot_y = row_y + 36
