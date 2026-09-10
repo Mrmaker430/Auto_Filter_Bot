@@ -46,7 +46,7 @@ def _get_font(path: str, size: int):
 def _draw_rounded_rectangle(draw: ImageDraw.ImageDraw, xy, radius, fill=None, outline=None, width=1):
     draw.rounded_rectangle(xy, radius=radius, fill=fill, outline=outline, width=width)
 
-def _wrap_text(text: str, font: ImageFont.ImageFont, max_width: int, max_lines: int = 4) -> list[str]:
+def _wrap_text(text: str, font: ImageFont.ImageFont, max_width: int, max_lines: int = 3) -> list[str]:
     words = text.split()
     lines = []
     current_line = []
@@ -79,11 +79,32 @@ def _wrap_text(text: str, font: ImageFont.ImageFont, max_width: int, max_lines: 
 
     return lines
 
+def _format_runtime(runtime_val) -> str:
+    if not runtime_val or str(runtime_val).upper() in ("N/A", "NONE"):
+        return ""
+    rt_str = str(runtime_val).lower().strip()
+    if 'h' in rt_str or 'm' in rt_str and not 'min' in rt_str:
+        return str(runtime_val).upper().strip()
+    digits = "".join(c for c in rt_str if c.isdigit())
+    if digits and digits.isdigit():
+        mins = int(digits)
+        if mins > 0:
+            h = mins // 60
+            m = mins % 60
+            if h > 0 and m > 0:
+                return f"{h}H {m}M"
+            elif h > 0:
+                return f"{h}H"
+            else:
+                return f"{m}M"
+    return str(runtime_val).upper().strip()
+
 async def generate_movie_poster(details: dict, channel_username: str = "@cholochhitro") -> BytesIO | None:
     """
-    Generates a 1280x720 landscape movie update poster matching the reference template.
+    Generates a 1280x720 landscape movie update poster matching the reference template (IMG_20260910_142802_592.jpg).
     details dictionary expected keys:
         - title: str
+        - localized_title: str
         - rating: float/str
         - year: str/int
         - tag: str (e.g. '#MOVIE' or '#SERIES')
@@ -91,10 +112,12 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         - plot: str
         - poster_url: str
         - backdrop_url: str
+        - logo_url: str
+        - runtime: str/int
     """
     try:
         width, height = 1280, 720
-        canvas = Image.new("RGBA", (width, height), (10, 1, 2, 255))
+        canvas = Image.new("RGBA", (width, height), (15, 15, 20, 255))
 
         # 1. Fetch images asynchronously
         poster_url = details.get("poster_url")
@@ -107,7 +130,7 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
             _download_image(logo_url)
         )
 
-        # 2. Draw Backdrop with Soft Red/Black Gradient (making background image more obvious)
+        # 2. Draw Backdrop with custom gradient so background image is prominent and legible
         if backdrop_img:
             bg_aspect = backdrop_img.width / backdrop_img.height
             target_h = height
@@ -117,212 +140,153 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
                 target_h = int(width / bg_aspect)
 
             resized_bg = backdrop_img.resize((target_w, target_h), Image.LANCZOS)
-            bg_crop = resized_bg.crop((target_w - width, 0, target_w, height))
+            bg_crop = resized_bg.crop(((target_w - width) // 2, 0, (target_w + width) // 2, height))
             canvas.paste(bg_crop, (0, 0))
 
-        # Softer overlay gradient layer so backdrop is vibrant & obvious while keeping text legible
+        # Soft overlay gradient: Darker towards bottom where text/cards are placed, lighter top
         gradient = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         draw_grad = ImageDraw.Draw(gradient)
 
-        for x in range(width):
-            if x < 400:
-                alpha = 180
-                r, g, b = 10, 1, 2
-            elif x < 800:
-                factor = (x - 400) / 400
-                alpha = int(180 * (1 - factor ** 0.8))
-                r, g, b = 10, 1, 2
+        for y in range(height):
+            if y < 200:
+                alpha = int(80 * (y / 200))
+            elif y < 400:
+                alpha = int(80 + 100 * ((y - 200) / 200))
             else:
-                alpha = 0
-                r, g, b = 0, 0, 0
-
-            draw_grad.line([(x, 0), (x, height)], fill=(r, g, b, alpha))
+                alpha = int(180 + 55 * ((y - 400) / 320))
+            draw_grad.line([(0, y), (width, y)], fill=(5, 5, 10, min(235, alpha)))
 
         canvas = Image.alpha_composite(canvas, gradient)
         draw = ImageDraw.Draw(canvas)
 
-        # 3. Draw Right Side Portrait Poster Card
-        card_x, card_y = 815, 75
-        card_w, card_h = 360, 560
-        radius = 28
-        border_width = 4
-        border_color = (0, 245, 212, 255) # Cyan border
+        # Fonts
+        font_watermark = _get_font(SANS_BOLD_FONT_PATH, 20)
+        font_top_title = _get_font(SANS_BOLD_FONT_PATH, 42)
+        font_rating_star = _get_font(SANS_BOLD_FONT_PATH, 22)
+        font_rating_num = _get_font(SANS_BOLD_FONT_PATH, 22)
+        font_badge = _get_font(SANS_BOLD_FONT_PATH, 15)
+        font_plot = _get_font(SANS_FONT_PATH, 18)
+
+        # 3. Top Right Corner Watermark Text
+        wm_text = channel_username if channel_username.startswith("@") else f"@{channel_username.lstrip('@')}"
+        draw.text((width - 45, 30), wm_text, font=font_watermark, fill=(255, 255, 255, 200), anchor="rt")
+
+        # 4. Top Left Title Area (e.g., Localized Title or Secondary Title)
+        top_title = str(details.get("localized_title") or details.get("title") or "").upper().strip()
+        top_title_x = 65
+        top_title_y = 330
+        if top_title:
+            # Draw text shadow
+            draw.text((top_title_x + 2, top_title_y + 2), top_title, font=font_top_title, fill=(0, 0, 0, 180), anchor="ls")
+            draw.text((top_title_x, top_title_y), top_title, font=font_top_title, fill=(230, 235, 240, 255), anchor="ls")
+
+        # 5. Bottom Left Portrait Poster Card
+        card_x, card_y = 65, 365
+        card_w, card_h = 200, 300
+        card_radius = 16
 
         if poster_img:
-            # Resize poster to fit inside card
             p_resized = poster_img.resize((card_w, card_h), Image.LANCZOS)
-
-            # Mask for rounded poster image
             mask = Image.new("L", (card_w, card_h), 0)
             mask_draw = ImageDraw.Draw(mask)
-            mask_draw.rounded_rectangle((0, 0, card_w, card_h), radius=radius, fill=255)
-
+            mask_draw.rounded_rectangle((0, 0, card_w, card_h), radius=card_radius, fill=255)
             canvas.paste(p_resized, (card_x, card_y), mask)
 
-        # Draw outer rounded cyan border
+        # Outer rounded white border
         draw.rounded_rectangle(
             (card_x, card_y, card_x + card_w, card_y + card_h),
-            radius=radius,
-            outline=border_color,
-            width=border_width
+            radius=card_radius,
+            outline=(255, 255, 255, 240),
+            width=3
         )
 
-        # 4. Left Side Text / Title Logo Elements
-        title_text = str(details.get("title") or "Movie Update").upper().strip()
-        start_x = 75
+        # 6. Main Title Logo / Title Text Area (Right of Poster Card)
+        start_right_x = 290
+        curr_y = 385
 
-        # Font definitions
-        font_rating_star = _get_font(SANS_BOLD_FONT_PATH, 24)
-        font_rating_num = _get_font(SANS_BOLD_FONT_PATH, 24)
-        font_badge_imdb = _get_font(SANS_BOLD_FONT_PATH, 16)
-        font_badge_info = _get_font(SANS_BOLD_FONT_PATH, 16)
-        font_badge_cat = _get_font(SANS_BOLD_FONT_PATH, 15)
-        font_plot = _get_font(SANS_BOLD_FONT_PATH, 20) # Bold description font
-        font_channel = _get_font(SANS_BOLD_FONT_PATH, 22)
-
-        curr_y = 65
+        title_text = str(details.get("title") or "").upper().strip()
 
         if logo_img:
-            # Fit title logo image in left region (max w: 680px, max h: 160px), left-aligned at start_x
-            max_logo_w, max_logo_h = 680, 160
+            max_logo_w, max_logo_h = 450, 110
             logo_w, logo_h = logo_img.size
             ratio = min(max_logo_w / logo_w, max_logo_h / logo_h)
             new_logo_w = max(1, int(logo_w * ratio))
             new_logo_h = max(1, int(logo_h * ratio))
 
             logo_resized = logo_img.resize((new_logo_w, new_logo_h), Image.LANCZOS)
-            logo_x = start_x
-            logo_y = curr_y
-
-            canvas.paste(logo_resized, (logo_x, logo_y), logo_resized)
+            canvas.paste(logo_resized, (start_right_x, curr_y), logo_resized)
             draw = ImageDraw.Draw(canvas)
-            curr_y = logo_y + new_logo_h + 20
+            curr_y += new_logo_h + 15
         else:
-            # Fallback: draw title logo text using styled serief logo font left-aligned at start_x
-            styled_title = Fonts.serief(title_text)
+            styled_title = Fonts.serief(title_text) if title_text else "MOVIE UPDATE"
+            font_title_main = _get_font(SERIF_BOLD_FONT_PATH, 48 if len(styled_title) <= 12 else 38)
+            draw.text((start_right_x + 2, curr_y + 2), styled_title, font=font_title_main, fill=(0, 0, 0, 180), anchor="lt")
+            draw.text((start_right_x, curr_y), styled_title, font=font_title_main, fill=(255, 255, 255, 255), anchor="lt")
+            bbox = font_title_main.getbbox(styled_title)
+            curr_y += (bbox[3] - bbox[1]) + 15
 
-            title_lines = []
-            words = styled_title.split()
-            if len(words) > 1 and words[0].upper() in ("𝐓𝐇𝐄", "𝐀", "𝐀𝐍"):
-                title_lines = [words[0], " ".join(words[1:])]
-            elif len(words) > 2:
-                mid = len(words) // 2
-                title_lines = [" ".join(words[:mid]), " ".join(words[mid:])]
-            else:
-                title_lines = [styled_title]
+        # White Accent Underline
+        line_w = 140
+        draw.line([(start_right_x, curr_y), (start_right_x + line_w, curr_y)], fill=(255, 255, 255, 220), width=3)
+        curr_y += 18
 
-            for idx, tline in enumerate(title_lines):
-                if len(title_lines) > 1 and idx == 0 and len(tline) <= 4:
-                    font_tl = _get_font(SERIF_BOLD_FONT_PATH, 52)
-                else:
-                    font_tl = _get_font(SERIF_BOLD_FONT_PATH, 72 if len(tline) <= 8 else 56)
-                draw.text((start_x, curr_y), tline, font=font_tl, fill=(255, 255, 255, 255), anchor="lt")
-                bbox = font_tl.getbbox(tline)
-                line_h = bbox[3] - bbox[1]
-                curr_y += max(line_h + 10, 65)
-
-            curr_y += 10
-
-        # 5. Rating & Badges Row
+        # 7. Rating & Badges Row
         row_y = curr_y
+        curr_badge_x = start_right_x
 
-        # Star ★ 5.7
+        # Star ★ Rating
         rating_val = str(details.get("rating") or "N/A")
-        draw.text((start_x, row_y), "★", font=font_rating_star, fill=(255, 204, 0, 255))
-        draw.text((start_x + 24, row_y - 1), f" {rating_val}", font=font_rating_num, fill=(255, 255, 255, 255))
+        draw.text((curr_badge_x, row_y), "★", font=font_rating_star, fill=(255, 204, 0, 255))
+        draw.text((curr_badge_x + 22, row_y - 1), f" {rating_val}", font=font_rating_num, fill=(255, 255, 255, 255))
+        curr_badge_x += 80
 
-        # IMDb Pill Badge
-        imdb_x = start_x + 105
-        _draw_rounded_rectangle(draw, (imdb_x, row_y - 2, imdb_x + 65, row_y + 26), radius=12, fill=(245, 197, 24, 255))
-        draw.text((imdb_x + 32, row_y + 12), "IMDb", font=font_badge_imdb, fill=(0, 0, 0, 255), anchor="mm")
+        # IMDb Badge
+        _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 2, curr_badge_x + 60, row_y + 24), radius=10, fill=(245, 197, 24, 255))
+        draw.text((curr_badge_x + 30, row_y + 11), "IMDb", font=font_badge, fill=(0, 0, 0, 255), anchor="mm")
+        curr_badge_x += 70
 
-        # Year Pill Badge
+        # Year Badge
         year_str = str(details.get("year") or "").strip()
         if year_str:
-            year_x = imdb_x + 80
-            _draw_rounded_rectangle(draw, (year_x, row_y - 2, year_x + 65, row_y + 26), radius=12, outline=(255, 255, 255, 200), width=1)
-            draw.text((year_x + 32, row_y + 12), year_str, font=font_badge_info, fill=(255, 255, 255, 255), anchor="mm")
+            _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 2, curr_badge_x + 60, row_y + 24), radius=10, fill=(225, 75, 50, 255))
+            draw.text((curr_badge_x + 30, row_y + 11), year_str, font=font_badge, fill=(255, 255, 255, 255), anchor="mm")
+            curr_badge_x += 70
 
-        # Magenta Underline
-        line_y = row_y + 38
-        draw.line([(start_x, line_y), (start_x + 220, line_y)], fill=(235, 30, 110, 255), width=3)
+        # Runtime Badge
+        runtime_fmt = _format_runtime(details.get("runtime"))
+        if runtime_fmt:
+            rt_w = font_badge.getbbox(runtime_fmt)[2] + 20
+            _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 2, curr_badge_x + rt_w, row_y + 24), radius=10, fill=(45, 140, 180, 255))
+            draw.text((curr_badge_x + rt_w // 2, row_y + 11), runtime_fmt, font=font_badge, fill=(255, 255, 255, 255), anchor="mm")
+            curr_badge_x += rt_w + 10
 
-        # 6. Category & Genre Badges Row
-        badge_y = line_y + 22
-        curr_badge_x = start_x
-
-        # Tag Badge (MOVIE / SERIES)
-        tag_val = str(details.get("tag") or "#MOVIE").replace("#", "").upper()
-        tag_w = font_badge_cat.getbbox(tag_val)[2] + 28
-        _draw_rounded_rectangle(draw, (curr_badge_x, badge_y, curr_badge_x + tag_w, badge_y + 32), radius=16, outline=(0, 245, 212, 255), width=2)
-        draw.text((curr_badge_x + tag_w // 2, badge_y + 16), tag_val, font=font_badge_cat, fill=(0, 245, 212, 255), anchor="mm")
-        curr_badge_x += tag_w + 14
-
-        # Genres Badges
+        # Genre / Category Badges
         genres_raw = details.get("genres") or []
         if isinstance(genres_raw, str):
             genres_list = [g.strip() for g in genres_raw.split(",") if g.strip() and g.strip() != "N/A"]
         else:
             genres_list = list(genres_raw)
 
-        for g in genres_list[:3]: # Max 3 genre pills
+        badge_colors = [(200, 110, 30, 255), (105, 55, 175, 255), (60, 140, 90, 255)]
+        for idx, g in enumerate(genres_list[:2]):
             g_text = str(g).upper()
-            g_w = font_badge_cat.getbbox(g_text)[2] + 28
-            if curr_badge_x + g_w > 720:
+            g_w = font_badge.getbbox(g_text)[2] + 24
+            if curr_badge_x + g_w > width - 30:
                 break
-            _draw_rounded_rectangle(draw, (curr_badge_x, badge_y, curr_badge_x + g_w, badge_y + 32), radius=16, outline=(235, 30, 110, 255), width=2)
-            draw.text((curr_badge_x + g_w // 2, badge_y + 16), g_text, font=font_badge_cat, fill=(235, 30, 110, 255), anchor="mm")
-            curr_badge_x += g_w + 14
+            bg_col = badge_colors[idx % len(badge_colors)]
+            _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 2, curr_badge_x + g_w, row_y + 24), radius=10, fill=bg_col)
+            draw.text((curr_badge_x + g_w // 2, row_y + 11), g_text, font=font_badge, fill=(255, 255, 255, 255), anchor="mm")
+            curr_badge_x += g_w + 10
 
-        # 7. Plot Overview Text (bold description text)
-        plot_y = badge_y + 52
+        # 8. Plot Description Area
+        plot_y = row_y + 36
         plot_text = str(details.get("plot") or "").strip()
         if plot_text and plot_text != "N/A":
-            wrapped_lines = _wrap_text(plot_text, font_plot, max_width=680, max_lines=4)
+            wrapped_lines = _wrap_text(plot_text, font_plot, max_width=930, max_lines=3)
             for line in wrapped_lines:
-                draw.text((start_x, plot_y), line, font=font_plot, fill=(255, 255, 255, 255))
-                plot_y += 28
-
-        # 8. Bottom Telegram Channel Pill Badge (placed under description, left-aligned at start_x in a straight line)
-        ch_handle = channel_username
-        if not ch_handle.startswith("@"):
-            ch_handle = "@" + ch_handle.lstrip("@")
-
-        handle_bbox = font_channel.getbbox(ch_handle)
-        handle_w = handle_bbox[2] - handle_bbox[0]
-        pill_w = max(240, handle_w + 70)
-        pill_h = 52
-        pill_x = start_x
-        pill_y = max(plot_y + 20, 600)
-
-        # Semi-transparent dark pill background matching reference image
-        pill_overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        pill_draw = ImageDraw.Draw(pill_overlay)
-        pill_draw.rounded_rectangle(
-            (pill_x, pill_y, pill_x + pill_w, pill_y + pill_h),
-            radius=26,
-            fill=(255, 255, 255, 35),
-            outline=(255, 255, 255, 60),
-            width=1
-        )
-
-        # Telegram Plane Icon inside circle
-        icon_cx, icon_cy = pill_x + 26, pill_y + 26
-        icon_r = 18
-        pill_draw.ellipse((icon_cx - icon_r, icon_cy - icon_r, icon_cx + icon_r, icon_cy + icon_r), fill=(40, 168, 234, 255))
-
-        # Simple paper plane icon drawing
-        plane_pts = [
-            (icon_cx - 9, icon_cy),
-            (icon_cx + 10, icon_cy - 8),
-            (icon_cx - 2, icon_cy + 9),
-            (icon_cx + 1, icon_cy + 3)
-        ]
-        pill_draw.polygon(plane_pts, fill=(255, 255, 255, 255))
-
-        canvas = Image.alpha_composite(canvas, pill_overlay)
-        draw = ImageDraw.Draw(canvas)
-        draw.text((pill_x + 55, pill_y + 26), ch_handle, font=font_channel, fill=(255, 255, 255, 255), anchor="lm")
+                draw.text((start_right_x + 1, plot_y + 1), line, font=font_plot, fill=(0, 0, 0, 160))
+                draw.text((start_right_x, plot_y), line, font=font_plot, fill=(230, 230, 230, 255))
+                plot_y += 24
 
         # Convert to BytesIO buffer
         output_buffer = BytesIO()
