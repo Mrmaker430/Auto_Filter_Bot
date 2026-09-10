@@ -19,6 +19,20 @@ def test_generate_movie_poster_mock():
         'plot': 'Test storyline plot overview text.',
         'runtime': '120 min',
     }
-    buf = asyncio.run(generate_movie_poster(details, '@testchannel'))
+    buf = asyncio.run(generate_movie_poster(details, '@cholochhitro'))
+    assert buf is not None
+    assert len(buf.getvalue()) > 0
+
+def test_generate_movie_poster_with_logo():
+    details = {
+        'title': 'Test Movie Logo',
+        'rating': 8.0,
+        'year': 2025,
+        'genres': ['Horror'],
+        'plot': 'Test plot text.',
+        'runtime': '100 min',
+        'logo_url': None,
+    }
+    buf = asyncio.run(generate_movie_poster(details, '@cholochhitro'))
     assert buf is not None
     assert len(buf.getvalue()) > 0
