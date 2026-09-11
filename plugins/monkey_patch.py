@@ -44,6 +44,11 @@ async def _resolve_video_cover(client: "Client", peer, cover: Union[str, BinaryI
         else:
             if hasattr(cover, "seek"):
                 cover.seek(0)
+            if not getattr(cover, "name", None):
+                try:
+                    cover.name = "cover.jpg"
+                except Exception:
+                    pass
             uploaded = await client.invoke(
                 raw.functions.messages.UploadMedia(
                     peer=peer,

@@ -318,6 +318,7 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         output_buffer = BytesIO()
         canvas.convert("RGB").save(output_buffer, format="JPEG", quality=95)
         output_buffer.seek(0)
+        output_buffer.name = "poster.jpg"
         return output_buffer
 
     except Exception as e:

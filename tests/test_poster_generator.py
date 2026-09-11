@@ -69,8 +69,12 @@ def test_get_or_generate_cover_fallback(monkeypatch):
     async def mock_get_movie_details(query):
         return None
 
+    async def mock_generate_movie_poster(details):
+        return None
+
     monkeypatch.setattr('plugins.Dreamxfutures.Imdbposter.get_movie_detailsx', mock_get_movie_detailsx)
     monkeypatch.setattr('plugins.Dreamxfutures.Imdbposter.get_movie_details', mock_get_movie_details)
+    monkeypatch.setattr('plugins.Dreamxfutures.poster_generator.generate_movie_poster', mock_generate_movie_poster)
 
     res = asyncio.run(get_or_generate_cover('UnknownMovie.2024.mkv', 'fallback_cover_id'))
     assert res == 'fallback_cover_id'

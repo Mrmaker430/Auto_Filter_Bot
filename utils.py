@@ -1145,8 +1145,8 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
         if isinstance(cached, bytes):
             buf = io.BytesIO(cached)
             buf.seek(0)
+            buf.name = "cover.jpg"
             return buf
-        return cached if cached else fallback_cover
 
     try:
         from plugins.Dreamxfutures.Imdbposter import get_movie_detailsx, get_movie_details
@@ -1156,7 +1156,10 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
         movie_doc = None
         if hasattr(db, 'movie_updates') and db.movie_updates is not None:
             try:
-                movie_doc = await db.movie_updates.find_one({"_id": clean_title})
+                pattern = f"^{re.escape(clean_title)}$"
+                movie_doc = await db.movie_updates.find_one({"_id": re.compile(pattern, re.IGNORECASE)})
+                if not movie_doc:
+                    movie_doc = await db.movie_updates.find_one({"title": re.compile(pattern, re.IGNORECASE)})
             except Exception:
                 movie_doc = None
 
@@ -1176,46 +1179,39 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
         else:
             try:
                 if TMDB_POSTER:
-                    details = await asyncio.wait_for(get_movie_detailsx(clean_title), timeout=3.5)
+                    details = await asyncio.wait_for(get_movie_detailsx(clean_title), timeout=8.0)
                     if not details or details.get("error") or (not details.get("poster_url") and not details.get("backdrop_url")):
-                        details = await asyncio.wait_for(get_movie_details(clean_title), timeout=3.5) or {}
+                        details = await asyncio.wait_for(get_movie_details(clean_title), timeout=8.0) or {}
                 else:
-                    details = await asyncio.wait_for(get_movie_details(clean_title), timeout=3.5) or {}
-            except asyncio.TimeoutError:
-                logger.warning(f"Timeout fetching details for cover of '{clean_title}'")
+                    details = await asyncio.wait_for(get_movie_details(clean_title), timeout=8.0) or {}
+            except Exception as e:
+                logger.warning(f"Error fetching details for cover of '{clean_title}': {e}")
                 details = None
 
-        if details and (details.get("poster_url") or details.get("backdrop_url")):
-            poster_details = {
-                "title": details.get("title") or clean_title,
-                "rating": details.get("rating", "N/A"),
-                "year": details.get("year", ""),
-                "tag": details.get("tag", "#MOVIE"),
-                "genres": details.get("genres", "N/A"),
-                "plot": details.get("plot", ""),
-                "poster_url": details.get("poster_url"),
-                "backdrop_url": details.get("backdrop_url") or details.get("poster_url"),
-                "logo_url": details.get("logo_url"),
-            }
-            generated_poster = await generate_movie_poster(poster_details)
-            if generated_poster:
-                poster_bytes = generated_poster.getvalue()
-                if len(POSTER_CACHE) >= MAX_POSTER_CACHE_SIZE:
-                    POSTER_CACHE.pop(next(iter(POSTER_CACHE)))
-                POSTER_CACHE[cache_key] = poster_bytes
-                buf = io.BytesIO(poster_bytes)
-                buf.seek(0)
-                return buf
-            elif details.get("poster_url"):
-                if len(POSTER_CACHE) >= MAX_POSTER_CACHE_SIZE:
-                    POSTER_CACHE.pop(next(iter(POSTER_CACHE)))
-                POSTER_CACHE[cache_key] = details["poster_url"]
-                return details["poster_url"]
+        poster_details = {
+            "title": (details.get("title") if details else None) or clean_title,
+            "rating": (details.get("rating") if details else None) or "N/A",
+            "year": (details.get("year") if details else None) or "",
+            "tag": (details.get("tag") if details else None) or "#MOVIE",
+            "genres": (details.get("genres") if details else None) or "N/A",
+            "plot": (details.get("plot") if details else None) or "",
+            "poster_url": (details.get("poster_url") if details else None),
+            "backdrop_url": (details.get("backdrop_url") if details else None) or (details.get("poster_url") if details else None),
+            "logo_url": (details.get("logo_url") if details else None),
+        }
+
+        generated_poster = await generate_movie_poster(poster_details)
+        if generated_poster:
+            poster_bytes = generated_poster.getvalue()
+            if len(POSTER_CACHE) >= MAX_POSTER_CACHE_SIZE:
+                POSTER_CACHE.pop(next(iter(POSTER_CACHE)))
+            POSTER_CACHE[cache_key] = poster_bytes
+            buf = io.BytesIO(poster_bytes)
+            buf.seek(0)
+            buf.name = "cover.jpg"
+            return buf
 
     except Exception as e:
         logger.warning(f"Error generating cover for '{file_name}': {e}")
 
-    if len(POSTER_CACHE) >= MAX_POSTER_CACHE_SIZE:
-        POSTER_CACHE.pop(next(iter(POSTER_CACHE)))
-    POSTER_CACHE[cache_key] = fallback_cover
     return fallback_cover
