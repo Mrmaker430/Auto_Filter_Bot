@@ -203,7 +203,14 @@ BAD_WORDS = {
     "www",
     "villa",
     "tg",
-    "original"
+    "original",
+    "MLSBD",
+    "1337xHd",
+    "pahe",
+    "primefix",
+    "yts",
+    "Filmy4wap",
+    "xyz"
 } # Set of bad words to filter out
    
 
