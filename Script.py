@@ -272,6 +272,8 @@ Mᴇꜱꜱᴀɢᴇ : <b>{}</b>"""
 
 <b>‣ ꜱɪᴢᴇ : </b>{file_size}
 
+<blockquote expandable>⚠️ <i>Sometimes bot paste different cover in the files don't worry always trust the title.</i></blockquote>
+
 <b>🍁 ʙʏ : <a href="https://t.me/cholochhitro">[ ᴄʜᴏʟᴏᴄʜʜɪᴛʀᴏ ]</a></b>"""
     
     MOVIE_UPDATE_NOTIFY_TXT = """<blockquote>📫 𝖭𝖤𝖶 𝖥𝖨𝖫𝖤 𝖠𝖣𝖣𝖤𝖣 ✅</blockquote>

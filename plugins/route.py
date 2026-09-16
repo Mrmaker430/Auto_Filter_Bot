@@ -146,6 +146,12 @@ async def media_streamer(request: web.Request, id: int, secure_hash: str):
             mime_type = "application/octet-stream"
             file_name = f"{secrets.token_hex(2)}.unknown"
 
+    disposition = (
+        f'attachment; filename="{file_name}"'
+        if request.rel_url.query.get("type") == "download"
+        else f'inline; filename="{file_name}"'
+    )
+
     return web.Response(
         status=206 if range_header else 200,
         body=body,
@@ -153,7 +159,7 @@ async def media_streamer(request: web.Request, id: int, secure_hash: str):
             "Content-Type": f"{mime_type}",
             "Content-Range": f"bytes {from_bytes}-{until_bytes}/{file_size}",
             "Content-Length": str(req_length),
-            "Content-Disposition": f'inline; filename="{file_name}"',  # inline for streaming
+            "Content-Disposition": disposition,
             "Accept-Ranges": "bytes",
             # CORS headers for JSMKV
             "Access-Control-Allow-Origin": "*",
