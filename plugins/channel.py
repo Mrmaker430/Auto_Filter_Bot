@@ -262,12 +262,16 @@ async def media_handler(bot, message):
     media.file_type = next(ft for ft in ("document", "video", "audio") if getattr(message, ft, None))
     media.caption = message.caption or ""
     success, info = await save_file(media)
-    if not success:
+    if not success and info != 0:
         return
+
+    file_name = getattr(media, "file_name", None) or getattr(message, "caption", None) or "Untitled"
+    if hasattr(file_name, "html"):
+        file_name = str(file_name)
 
     try:
         if await db.movie_update_status(bot.me.id):
-            await process_and_send_update(bot, media.file_name, media.caption)
+            await process_and_send_update(bot, file_name, media.caption)
     except Exception:
         logger.exception("Error processing media")
 
