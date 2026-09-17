@@ -3,7 +3,7 @@ import time
 import re
 import asyncio
 from pyrogram import Client, filters, enums
-from pyrogram.errors.exceptions.bad_request_400 import ChannelInvalid, ChatAdminRequired, UsernameInvalid, UsernameNotModified
+from pyrogram.errors import FloodWait, ChannelInvalid, ChatAdminRequired, UsernameInvalid, UsernameNotModified
 from info import ADMINS, INDEX_REQ_CHANNEL as LOG_CHANNEL
 from database.ia_filterdb import save_file
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -165,18 +165,29 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot):
                 batch_start = time.time()
                 start_id = current + 1
                 end_id = min(current + BATCH_SIZE, lst_msg_id)
+                if start_id > end_id:
+                    break
                 message_ids = range(start_id, end_id + 1)
                 try:
                     messages = await bot.get_messages(chat, list(message_ids))
                     if not isinstance(messages, list):
                         messages = [messages]
+                except FloodWait as f:
+                    await asyncio.sleep(f.value + 2)
+                    try:
+                        messages = await bot.get_messages(chat, list(message_ids))
+                        if not isinstance(messages, list):
+                            messages = [messages]
+                    except Exception:
+                        errors += len(message_ids)
+                        current = end_id
+                        continue
                 except Exception:
                     errors += len(message_ids)
-                    current += len(message_ids)
+                    current = end_id
                     continue
                 save_tasks = []
                 for message in messages:
-                    current += 1
                     try:
                         if message.empty:
                             deleted += 1
@@ -210,6 +221,7 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot):
                             duplicate += 1
                         elif code == 2:
                             errors += 1
+                current = end_id
                 batch_time = time.time() - batch_start
                 batch_times.append(batch_time)
                 elapsed = time.time() - start_time

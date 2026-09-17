@@ -106,10 +106,13 @@ async def save_file(media):
     """Save file in database, with detailed logging."""
     file_id, file_ref = unpack_new_file_id(media.file_id)
     file_unique_id = getattr(media, "file_unique_id", None)
+    raw_file_name = getattr(media, "file_name", None) or getattr(media, "caption", None) or "Untitled"
+    if hasattr(raw_file_name, "html"):
+        raw_file_name = str(raw_file_name)
     file_name = re.sub(
-        r"[_\-\.#+$%^&*()!~`,;:\"'?/<>\[\]{}=|\\]", " ", str(media.file_name)
+        r"[_\-\.#+$%^&*()!~`,;:\"'?/<>\[\]{}=|\\]", " ", str(raw_file_name)
     )
-    file_name = re.sub(r"\s+", " ", file_name).strip()
+    file_name = re.sub(r"\s+", " ", file_name).strip() or "Untitled"
     saveMedia = Media
     target_db = "Primary"
     duplicate_filter = {"$or": [{"file_id": file_id}]}
@@ -142,6 +145,12 @@ async def save_file(media):
     try:
         cover_media = getattr(media, "video_cover", None) or getattr(media, "cover", None)
         cover_to_use = getattr(cover_media, "file_id", None)
+        file_caption = None
+        if getattr(media, "caption", None) and INDEX_CAPTION:
+            file_caption = getattr(media.caption, "html", media.caption)
+            if not isinstance(file_caption, str):
+                file_caption = str(file_caption)
+
         record = saveMedia(
             file_id=file_id,
             file_unique_id=file_unique_id,
@@ -150,7 +159,7 @@ async def save_file(media):
             file_size=media.file_size,
             file_type=media.file_type,
             mime_type=media.mime_type,
-            caption=(media.caption.html if media.caption and INDEX_CAPTION else None),
+            caption=file_caption,
             cover=cover_to_use if COVERX else None,
         )
     except Exception as e:
