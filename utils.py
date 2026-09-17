@@ -1144,6 +1144,7 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
         cached = POSTER_CACHE[cache_key]
         if isinstance(cached, bytes):
             buf = io.BytesIO(cached)
+            buf.name = "cover.jpg"
             buf.seek(0)
             return buf
         return cached if cached else fallback_cover
@@ -1151,12 +1152,18 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
     try:
         from plugins.Dreamxfutures.Imdbposter import get_movie_detailsx, get_movie_details
         from plugins.Dreamxfutures.poster_generator import generate_movie_poster
+        from plugins.channel import extract_media_info
         from info import TMDB_POSTER
 
         movie_doc = None
         if hasattr(db, 'movie_updates') and db.movie_updates is not None:
             try:
                 movie_doc = await db.movie_updates.find_one({"_id": clean_title})
+                if not movie_doc:
+                    info = extract_media_info(file_name, "")
+                    base_name = info.get("base_name")
+                    if base_name and base_name != clean_title:
+                        movie_doc = await db.movie_updates.find_one({"_id": base_name})
             except Exception:
                 movie_doc = None
 
@@ -1204,6 +1211,7 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
                     POSTER_CACHE.pop(next(iter(POSTER_CACHE)))
                 POSTER_CACHE[cache_key] = poster_bytes
                 buf = io.BytesIO(poster_bytes)
+                buf.name = "cover.jpg"
                 buf.seek(0)
                 return buf
             elif details.get("poster_url"):
