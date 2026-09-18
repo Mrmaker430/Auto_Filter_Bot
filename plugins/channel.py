@@ -587,20 +587,10 @@ def generate_movie_message(movie_doc, base_name):
     filename_display = base_name
     if year_val and filename_display.strip().endswith(year_val):
         filename_display = filename_display.strip()[:-len(year_val)].strip()
-
-    imdb_url = movie_doc.get("imdb_url", "")
-    if imdb_url:
-        filename_link = f'<a href="{imdb_url}"><b>{filename_display}</b></a>'
-    else:
-        filename_link = f'<b>{filename_display}</b>'
-
-    search_link = GRP_LNK or temp.B_LINK
-
     return script.MOVIE_UPDATE_NOTIFY_TXT.format(
         poster_url=movie_doc.get("poster_url", ""),
-        imdb_url=imdb_url,
+        imdb_url=movie_doc.get("imdb_url", ""),
         filename=filename_display,
-        filename_link=filename_link,
         tag=primary_tag,
         year=year_val,
         genres=genres,
@@ -609,5 +599,5 @@ def generate_movie_message(movie_doc, base_name):
         language=language_str,
         episodes=epi_block,
         rating=rating_text,
-        search_link=search_link
-    )
+        search_link=temp.B_LINK
+)

@@ -276,19 +276,17 @@ Mᴇꜱꜱᴀɢᴇ : <b>{}</b>"""
 
 <b>🍁 ʙʏ : <a href="https://t.me/cholochhitro">[ ᴄʜᴏʟᴏᴄʜʜɪᴛʀᴏ ]</a></b>"""
     
-    MOVIE_UPDATE_NOTIFY_TXT = """<b><blockquote expandable><h1>  NEW FILE ADDED  </h1></blockquote></b>
+    MOVIE_UPDATE_NOTIFY_TXT = """<blockquote>📫 𝖭𝖤𝖶 𝖥𝖨𝖫𝖤 𝖠𝖣𝖣𝖤𝖣 ✅</blockquote>
 
-<code>┌─────────────┬──────────────────────────┐</code>
-<code>│ ᴛɪᴛʟᴇ       │</code> {filename_link}
-<code>│ ɢᴇɴʀᴇꜱ      │</code> <b>{genres}</b>
-<code>│ ᴏᴛᴛ         │</code> <b>{ott}</b>
-<code>│ Qᴜᴀʟɪᴛʏ     │</code> <b>{quality}</b>
-<code>│ ʟᴀɴɢᴜᴀɢᴇꜱ   │</code> <b>{language}</b>
-<code>│ ʀᴀᴛɪɴɢ      │</code> <b>{rating}</b>
-<code>└─────────────┴──────────────────────────┘</code>
+🏷️ <b>Title</b> : <a href={imdb_url}>{filename}</a>
+🎭 <b>Genres</b> : {genres}
+📡 <b>Ott</b> : {ott}
+⏩ <b>Quality</b> : {quality}
+☀️ <b>Languages</b> : {language}
+🌟 <b>Rating</b> : {rating}
 {episodes}
 
-<a href="{search_link}"><b>🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎</b></a>"""
+"""
 
 
     IMDB_TEMPLATE_TXT = """<b><a href={url}>{title} (<a href={url}/releaseinfo>{year}</a>)
