@@ -22,12 +22,12 @@ def test_generate_movie_message():
     }
 
     msg = generate_movie_message(movie_doc, "Inception 2010")
-    assert "<b>🔥 NEW FILE ADDED 🔥</b>" in msg
+    assert "<b>🔥 𝖭𝖤𝖶 𝖥𝖨𝖫𝖤 𝖠𝖣𝖣𝖤𝖣 🔥</b>" in msg
     assert "<blockquote expandable>" in msg
-    assert "🏷️ <b>Title</b> : <a href=\"https://www.imdb.com/title/tt1375666/\">Inception</a>" in msg
-    assert "🎭 <b>Genres</b> : Action, Sci-Fi" in msg
-    assert "📡 <b>Ott</b> : Netflix" in msg
-    assert "⏩ <b>Quality</b> : 1080p" in msg
-    assert "☀️ <b>Languages</b> : English, Hindi" in msg
-    assert "🌟 <b>Rating</b> : 8.8" in msg
+    assert "🏷️ <b>𝖳𝗂𝗍𝗅𝖾</b> : <a href=\"https://www.imdb.com/title/tt1375666/\"><b>Inception</b></a>" in msg
+    assert "🎭 <b>𝖦𝖾𝗇𝗋𝖾𝗌</b> : Action, Sci-Fi" in msg
+    assert "📡 <b>𝖮𝗍𝗍</b> : Netflix" in msg
+    assert "⏩ <b>𝖰𝗎𝖺𝗅𝗂𝗍𝗒</b> : 1080p" in msg
+    assert "☀️ <b>𝖫𝖺𝗇𝗀𝗎𝖺𝗀𝖾𝗌</b> : English, Hindi" in msg
+    assert "🌟 <b>𝖱𝖺𝗍𝗂𝗇𝗀</b> : 8.8" in msg
     assert "</blockquote>" in msg
