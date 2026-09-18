@@ -276,17 +276,15 @@ Mᴇꜱꜱᴀɢᴇ : <b>{}</b>"""
 
 <b>🍁 ʙʏ : <a href="https://t.me/cholochhitro">[ ᴄʜᴏʟᴏᴄʜʜɪᴛʀᴏ ]</a></b>"""
     
-    MOVIE_UPDATE_NOTIFY_TXT = """<blockquote>📫 𝖭𝖤𝖶 𝖥𝖨𝖫𝖤 𝖠𝖣𝖣𝖤𝖣 ✅</blockquote>
+    MOVIE_UPDATE_NOTIFY_TXT = """<b>🔥 NEW FILE ADDED 🔥</b>
 
-🏷️ <b>Title</b> : <a href={imdb_url}>{filename}</a>
+<blockquote expandable>🏷️ <b>Title</b> : <a href="{imdb_url}">{filename}</a>
 🎭 <b>Genres</b> : {genres}
 📡 <b>Ott</b> : {ott}
 ⏩ <b>Quality</b> : {quality}
 ☀️ <b>Languages</b> : {language}
 🌟 <b>Rating</b> : {rating}
-{episodes}
-
-"""
+{episodes}</blockquote>"""
 
 
     IMDB_TEMPLATE_TXT = """<b><a href={url}>{title} (<a href={url}/releaseinfo>{year}</a>)
