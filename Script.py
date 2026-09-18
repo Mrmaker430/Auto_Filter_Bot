@@ -278,14 +278,12 @@ Mᴇꜱꜱᴀɢᴇ : <b>{}</b>"""
     
     MOVIE_UPDATE_NOTIFY_TXT = """<b><blockquote expandable><h1>  NEW FILE ADDED  </h1></blockquote></b>
 
-<code>┌─────────────┬──────────────────────────┐</code>
-<code>│ ᴛɪᴛʟᴇ       │</code> {filename_link}
-<code>│ ɢᴇɴʀᴇꜱ      │</code> <b>{genres}</b>
-<code>│ ᴏᴛᴛ         │</code> <b>{ott}</b>
-<code>│ Qᴜᴀʟɪᴛʏ     │</code> <b>{quality}</b>
-<code>│ ʟᴀɴɢᴜᴀɢᴇꜱ   │</code> <b>{language}</b>
-<code>│ ʀᴀᴛɪɴɢ      │</code> <b>{rating}</b>
-<code>└─────────────┴──────────────────────────┘</code>
+<b>🎬 ᴛɪᴛʟᴇ :</b> {filename_link}
+<b>🎭 ɢᴇɴʀᴇꜱ :</b> <i>{genres}</i>
+<b>📺 ᴏᴛᴛ :</b> <i>{ott}</i>
+<b>💿 Qᴜᴀʟɪᴛʏ :</b> <i>{quality}</i>
+<b>🔊 ʟᴀɴɢᴜᴀɢᴇꜱ :</b> <i>{language}</i>
+<b>⭐ ʀᴀᴛɪɴɢ :</b> <i>{rating}</i>
 {episodes}
 
 <a href="{search_link}"><b>🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎</b></a>"""

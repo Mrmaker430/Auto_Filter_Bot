@@ -29,15 +29,13 @@ def test_generate_movie_message_format():
     # Assert title header styled centered at top
     assert "<h1>  NEW FILE ADDED  </h1>" in msg
 
-    # Assert 2-row table format structure elements
-    assert "┌─────────────┬──────────────────────────┐" in msg
-    assert "│ ᴛɪᴛʟᴇ       │" in msg
-    assert "│ ɢᴇɴʀᴇꜱ      │" in msg
-    assert "│ ᴏᴛᴛ         │" in msg
-    assert "│ Qᴜᴀʟɪᴛʏ     │" in msg
-    assert "│ ʟᴀɴɢᴜᴀɢᴇꜱ   │" in msg
-    assert "│ ʀᴀᴛɪɴɢ      │" in msg
-    assert "└─────────────┴──────────────────────────┘" in msg
+    # Assert HTML format structure elements
+    assert "<b>🎬 ᴛɪᴛʟᴇ :</b>" in msg
+    assert "<b>🎭 ɢᴇɴʀᴇꜱ :</b>" in msg
+    assert "<b>📺 ᴏᴛᴛ :</b>" in msg
+    assert "<b>💿 Qᴜᴀʟɪᴛʏ :</b>" in msg
+    assert "<b>🔊 ʟᴀɴɢᴜᴀɢᴇꜱ :</b>" in msg
+    assert "<b>⭐ ʀᴀᴛɪɴɢ :</b>" in msg
 
     # Assert search link styled centered at bottom inside message
     assert '<a href="' in msg
