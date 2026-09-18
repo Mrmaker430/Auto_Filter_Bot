@@ -90,9 +90,9 @@ async def custom_send_cached_media(
             "types.ForceReply"
         ] = None
     ) -> Optional["types.Message"]:
-        
+
         peer = await self.resolve_peer(chat_id)
-        
+
         reply_to = None
         if reply_to_message_id or reply_to_story_id:
             reply_parameters = types.ReplyParameters(
@@ -109,7 +109,7 @@ async def custom_send_cached_media(
                 message_thread_id=message_thread_id,
                 direct_messages_topic_id=reply_to_monoforum_id
             )
-        
+
         vidcover_file = await _resolve_video_cover(self, peer, cover)
         media = utils.get_input_media_from_file_id(
             file_id,
@@ -177,7 +177,7 @@ async def custom_send_video(
         progress: Callable = None,
         progress_args: tuple = ()
     ) -> Optional["types.Message"]:
-    
+
         file = None
         peer = await self.resolve_peer(chat_id)
 
@@ -199,7 +199,7 @@ async def custom_send_video(
             )
         try:
             vidcover_file = await _resolve_video_cover(self, peer, cover)
-            
+
             if isinstance(video, str):
                 if os.path.isfile(video):
                     thumb = await self.save_file(thumb)
@@ -613,37 +613,70 @@ if not getattr(Message, "_listen_patched", False):
                 if not future.done():
                     future.set_result(msg)
                 raise pyrogram.StopPropagation
-                
+
             if key_chat in client.listen_futures:
                 future = client.listen_futures.pop(key_chat)
                 if not future.done():
                     future.set_result(msg)
-                raise pyrogram.StopPropagation      
+                raise pyrogram.StopPropagation
         return msg
     Message._parse = _custom_parse
 
 
 async def custom_listen(self, chat_id, filters=None, timeout=60, user_id=None):
     if not hasattr(self, "listen_futures"):
-        self.listen_futures = {} 
+        self.listen_futures = {}
     future = asyncio.get_running_loop().create_future()
     if user_id:
         key = (chat_id, user_id)
     else:
         key = (chat_id, None)
-     
+
     self.listen_futures[key] = future
     try:
         if timeout:
             message = await asyncio.wait_for(future, timeout=timeout)
         else:
-            message = await future 
+            message = await future
         if filters:
             if not await filters(self, message):
-                return await self.listen(chat_id, filters, timeout, user_id)       
+                return await self.listen(chat_id, filters, timeout, user_id)
         return message
     except asyncio.TimeoutError:
         self.listen_futures.pop(key, None)
         raise
 
 pyrogram.Client.listen = custom_listen
+
+if not getattr(Message, "_reply_kwargs_patched", False):
+    Message._reply_kwargs_patched = True
+
+    _orig_reply = Message.reply
+    async def _patched_reply(self, text, *args, **kwargs):
+        quote = kwargs.pop("quote", None)
+        if "reply_to_message_id" not in kwargs:
+            if quote is None or quote is True:
+                kwargs["reply_to_message_id"] = self.id
+
+        return await self._client.send_message(
+            chat_id=self.chat.id,
+            text=text,
+            *args,
+            **kwargs
+        )
+
+    Message.reply = _patched_reply
+    Message.reply_text = _patched_reply
+
+    _orig_edit_text = Message.edit_text
+    async def _patched_edit_text(self, text=None, *args, **kwargs):
+        return await self._client.edit_message_text(
+            chat_id=self.chat.id,
+            message_id=self.id,
+            text=text,
+            *args,
+            **kwargs
+        )
+
+    Message.edit_text = _patched_edit_text
+    Message.edit = _patched_edit_text
