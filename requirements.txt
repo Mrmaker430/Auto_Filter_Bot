@@ -1,4 +1,4 @@
-kurigram>=2.2.26
+kurigram
 tgcrypto
 pymongo==4.13.2
 motor==3.7.1
