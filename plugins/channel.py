@@ -570,7 +570,7 @@ def generate_movie_message(movie_doc, base_name):
 
         epi_str = "\n".join(episode_lines)
         if epi_str:
-            epi_block = f"\n📺 <b>Episodes</b> : <b>\n{epi_str}</b>"
+            epi_block = f"📺 ᴇᴘɪsᴏᴅᴇs : <b>\n{epi_str}</b>"
 
     genres = movie_doc.get("genres", "N/A")
     quality_str = ", ".join(sorted(all_qualities)) if all_qualities else "N/A"
