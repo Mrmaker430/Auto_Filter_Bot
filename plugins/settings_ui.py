@@ -760,6 +760,47 @@ async def prompt_group_deletion(client, query):
         logger.error(f"Callback Error - {e}")
         await query.answer("An error occurred!", show_alert=True)
 
+@Client.on_callback_query(filters.regex(r"^open_settings"))
+async def handle_open_settings(client, query):
+    try:
+        parts = query.data.split("#")
+        user_id = query.from_user.id if query.from_user else None
+        if len(parts) > 1 and parts[1]:
+            grp_id = int(parts[1])
+            if not await is_check_admin(client, grp_id, user_id):
+                return await query.answer("<b>ɴᴇᴇᴅ ᴛᴏ ʙᴇ ᴀᴅᴍɪɴ ᴛᴏ ᴜꜱᴇ ᴛʜɪꜱ ✅.</b>", show_alert=True)
+            from utils import group_setting_buttons, get_settings_text
+            chat = await client.get_chat(grp_id)
+            btn = await group_setting_buttons(grp_id)
+            await query.message.edit_text(
+                text=await get_settings_text(grp_id, chat.title),
+                reply_markup=InlineKeyboardMarkup(btn),
+                disable_web_page_preview=True,
+                parse_mode=enums.ParseMode.HTML
+            )
+        else:
+            connected_groups = await db.get_connected_grps(user_id)
+            if not connected_groups:
+                return await query.answer("Nᴏ Cᴏɴɴᴇᴄᴛᴇᴅ Gʀᴏᴜᴘs Fᴏᴜɴᴅ .", show_alert=True)
+            group_list = []
+            for group in connected_groups:
+                try:
+                    Chat = await client.get_chat(group)
+                    group_list.append([InlineKeyboardButton(text=Chat.title, callback_data=f"grp_pm#{Chat.id}")])
+                except Exception:
+                    pass
+            if not group_list:
+                return await query.answer("Nᴏ Cᴏɴɴᴇᴄᴛᴇᴅ Gʀᴏᴜᴘs Fᴏᴜɴᴅ .", show_alert=True)
+            await query.message.edit_text(
+                "⚠️ ꜱᴇʟᴇᴄᴛ ᴛʜᴇ ɢʀᴏᴜᴘ ᴡʜᴏꜱᴇ ꜱᴇᴛᴛɪɴɢꜱ ʏᴏᴜ ᴡᴀɴᴛ ᴛᴏ ᴄʜᴀɴɢᴇ.\n\n"
+                "ɪꜰ ʏᴏᴜʀ ɢʀᴏᴜᴘ ɪꜱ ɴᴏᴛ ꜱʜᴏᴡɪɴɢ ʜᴇʀᴇ,\n"
+                "ᴜꜱᴇ /reload ɪɴ ᴛʜᴀᴛ ɢʀᴏᴜᴘ ᴀɴᴅ ɪᴛ ᴡɪʟʟ ᴀᴘᴘᴇᴀʀ ʜᴇʀᴇ.",
+                reply_markup=InlineKeyboardMarkup(group_list)
+            )
+    except Exception as e:
+        logger.error(f"Error in open_settings handler: {e}")
+        await query.answer("An error occurred!", show_alert=True)
+
 @Client.on_callback_query(filters.regex(r"^delete_group#"))
 async def process_group_deletion(client, query):
     try:
