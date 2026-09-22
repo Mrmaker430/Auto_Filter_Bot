@@ -8,7 +8,7 @@ from pyrogram import Client, filters, enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram.errors.exceptions.bad_request_400 import MessageTooLong, PeerIdInvalid
 from pyrogram.errors import ChatAdminRequired
-from info import ADMINS, MULTIPLE_DB, LOG_CHANNEL, OWNER_LNK, MELCOW_PHOTO
+from info import ADMINS, MULTIPLE_DB, LOG_CHANNEL, OWNER_LNK, MELCOW_PHOTO, UPDATE_CHNL_LNK
 from database.users_chats_db import db
 from database.ia_filterdb import Media, Media2, db as db_stats, db2 as db2_stats, client, client2
 from utils import get_size, temp, get_settings, get_readable_time
@@ -189,9 +189,17 @@ async def get_stats(bot, message):
         ram = psutil.virtual_memory().percent
         cpu = psutil.cpu_percent()
         
+        buttons = [[
+            InlineKeyboardButton('❌ Close', callback_data='close_data', style=enums.ButtonStyle.DANGER),
+            InlineKeyboardButton('📢 Updates ↗', url=UPDATE_CHNL_LNK, style=enums.ButtonStyle.PRIMARY),
+            InlineKeyboardButton('⚙ Settings', callback_data='open_settings', style=enums.ButtonStyle.SUCCESS)
+        ]]
+        reply_markup = InlineKeyboardMarkup(buttons)
+
         if not MULTIPLE_DB:
             await msg.edit(script.STATUS_TXT.format(
-                total_users, totl_chats, premium, file1, get_size(current_db_size), get_size(db_size), get_size(free), uptime, ram, cpu))                                               
+                total_users, totl_chats, premium, file1, get_size(current_db_size), get_size(db_size), get_size(free), uptime, ram, cpu),
+                reply_markup=reply_markup)
             return
             
         file2 = await Media2.count_documents()
@@ -215,7 +223,7 @@ async def get_stats(bot, message):
             total_users, totl_chats, premium, file1, get_size(current_db_size), get_size(db_size), get_size(free),
             file2, get_size(current_db2_size), get_size(db2_size), get_size(free2), 
             uptime, ram, cpu, (int(file1) + int(file2))
-            ))
+            ), reply_markup=reply_markup)
     except Exception as e:
        logger.error("Error In stats: %s", e)        
 
