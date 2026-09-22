@@ -1179,11 +1179,8 @@ async def cb_handler(client: Client, query: CallbackQuery):
         buttons = [[
                     InlineKeyboardButton('🔰 ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ 🔰', url=f'http://telegram.me/{temp.U_NAME}?startgroup=true')
                 ],[
-                    InlineKeyboardButton(' ʜᴇʟᴘ 📢', callback_data='help'),
-                    InlineKeyboardButton(' ᴀʙᴏᴜᴛ 📖', callback_data='about')
-                ],[
-                    InlineKeyboardButton('ᴛᴏᴘ sᴇᴀʀᴄʜɪɴɢ ⭐', callback_data="topsearch"),
-                     InlineKeyboardButton('ᴜᴘɢʀᴀᴅᴇ 🎟', callback_data="premium_info"),
+                    InlineKeyboardButton(' ʜᴇʟᴘ 📢', callback_data='help', style=enums.ButtonStyle.PRIMARY),
+                    InlineKeyboardButton(' ᴀʙᴏᴜᴛ 📖', callback_data='about', style=enums.ButtonStyle.PRIMARY)
                 ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         current_time = datetime.now(pytz.timezone(TIMEZONE))
@@ -1239,7 +1236,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
 
     elif query.data == "help":
         buttons = [[
-            InlineKeyboardButton('⇋ ʙᴀᴄᴋ ᴛᴏ ʜᴏᴍᴇ ⇋', callback_data='start')
+            InlineKeyboardButton('⇋ ʙᴀᴄᴋ ᴛᴏ ʜᴏᴍᴇ ⇋', callback_data='start', style=enums.ButtonStyle.DANGER)
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -1250,12 +1247,10 @@ async def cb_handler(client: Client, query: CallbackQuery):
 
     elif query.data == "about":
         buttons = [[
-            InlineKeyboardButton('‼️ ᴅɪꜱᴄʟᴀɪᴍᴇʀ ‼️', callback_data='disclaimer'),
-            InlineKeyboardButton ('🪔 sᴏᴜʀᴄᴇ', callback_data='source'),
+            InlineKeyboardButton('ᴅᴏɴᴀᴛɪᴏɴ 💰', callback_data='donation', style=enums.ButtonStyle.SUCCESS),
+            InlineKeyboardButton('ᴜᴘɢʀᴀᴅᴇ 🎟', callback_data='premium_info', style=enums.ButtonStyle.SUCCESS)
         ],[
-            InlineKeyboardButton('ᴅᴏɴᴀᴛɪᴏɴ 💰', callback_data='donation'),
-        ],[
-            InlineKeyboardButton('⇋ ʙᴀᴄᴋ ᴛᴏ ʜᴏᴍᴇ ⇋', callback_data='start')
+            InlineKeyboardButton('⇋ ʙᴀᴄᴋ ᴛᴏ ʜᴏᴍᴇ ⇋', callback_data='start', style=enums.ButtonStyle.DANGER)
         ]]
         reply_markup = InlineKeyboardMarkup(buttons)
         await query.message.edit_text(
@@ -1299,31 +1294,8 @@ async def cb_handler(client: Client, query: CallbackQuery):
 
 
 
-    elif query.data == "source":
-        buttons = [[
-            InlineKeyboardButton('ᴅʀᴇᴀᴍxʙᴏᴛᴢ 📜', url='https://github.com/DreamXBotz/Auto_Filter_Bot.git'),
-            InlineKeyboardButton('⇋ ʙᴀᴄᴋ ⇋', callback_data='about')
-        ]]
-        reply_markup = InlineKeyboardMarkup(buttons)
-        await query.message.edit_text(
-            text=script.SOURCE_TXT,
-            reply_markup=reply_markup,
-            parse_mode=enums.ParseMode.HTML
-        )
-
     elif query.data == "ref_point":
         await query.answer(f'You Have: {referdb.get_refer_points(query.from_user.id)} Refferal points.', show_alert=True)
-
-    elif query.data == "disclaimer":
-            btn = [[
-                    InlineKeyboardButton("⇋ ʙᴀᴄᴋ ⇋", callback_data="about")
-                  ]]
-            reply_markup = InlineKeyboardMarkup(btn)
-            await query.message.edit_text(
-                text=(script.DISCLAIMER_TXT),
-                reply_markup=reply_markup,
-                parse_mode=enums.ParseMode.HTML
-            )
 
     elif query.data == "premium_info":
         try:
@@ -1333,7 +1305,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
                 InlineKeyboardButton('• ʀᴇꜰᴇʀ ꜰʀɪᴇɴᴅꜱ', callback_data='reffff'),
                 InlineKeyboardButton('ꜰʀᴇᴇ ᴛʀɪᴀʟ •', callback_data='give_trial')
             ],[
-                InlineKeyboardButton('⇋ ʙᴀᴄᴋ ᴛᴏ ʜᴏᴍᴇ ⇋', callback_data='start')
+                InlineKeyboardButton('⇋ ʙᴀᴄᴋ ᴛᴏ ʜᴏᴍᴇ ⇋', callback_data='start', style=enums.ButtonStyle.DANGER)
             ]]
             reply_markup = InlineKeyboardMarkup(btn)
             await client.edit_message_media(
