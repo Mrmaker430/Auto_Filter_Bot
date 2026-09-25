@@ -269,13 +269,22 @@ async def media_handler(bot, message):
     if hasattr(file_name, "html"):
         file_name = str(file_name)
 
+    # Extract primary thumbnail file_id if present
+    primary_thumb = None
+    cover_media = getattr(media, "video_cover", None) or getattr(media, "cover", None) or getattr(media, "thumbs", None)
+    if cover_media:
+        if isinstance(cover_media, list) and len(cover_media) > 0:
+            primary_thumb = getattr(cover_media[0], "file_id", None)
+        else:
+            primary_thumb = getattr(cover_media, "file_id", None)
+
     try:
         if await db.movie_update_status(bot.me.id):
-            await process_and_send_update(bot, file_name, media.caption)
+            await process_and_send_update(bot, file_name, media.caption, primary_thumb=primary_thumb)
     except Exception:
         logger.exception("Error processing media")
 
-async def process_and_send_update(bot, filename, caption):
+async def process_and_send_update(bot, filename, caption, primary_thumb=None):
     try:
         media_info = extract_media_info(filename, caption)
         base_name = media_info["base_name"]
@@ -283,13 +292,13 @@ async def process_and_send_update(bot, filename, caption):
 
         lock = locks[base_name]
         async with lock:
-            await _process_with_lock(bot, filename, caption, media_info, base_name, processed)
+            await _process_with_lock(bot, filename, caption, media_info, base_name, processed, primary_thumb=primary_thumb)
     except PyMongoError as e:
         logger.error(f"Database error in process_and_send_update: {e}")
     except Exception as e:
         logger.exception(f"Processing failed in process_and_send_update: {e}")
 
-async def _process_with_lock(bot, filename, caption, media_info, base_name, processed):
+async def _process_with_lock(bot, filename, caption, media_info, base_name, processed, primary_thumb=None):
     if not hasattr(db, 'movie_updates'):
         db.movie_updates = db.db.movie_updates
 
@@ -331,6 +340,7 @@ async def _process_with_lock(bot, filename, caption, media_info, base_name, proc
             "poster_url": details.get("poster_url"),
             "backdrop_url": details.get("backdrop_url"),
             "logo_url": details.get("logo_url"),
+            "primary_thumb": primary_thumb,
             "genres": genres,
             "rating": details.get("rating", "N/A"),
             "imdb_url": details.get("url", "") if not TMDB_POSTER or error_tmdb else details.get("tmdb_url"),
@@ -393,6 +403,7 @@ async def send_movie_update(bot, base_name):
                 "poster_url": movie_doc.get("poster_url"),
                 "backdrop_url": movie_doc.get("backdrop_url") or movie_doc.get("poster_url"),
                 "logo_url": movie_doc.get("logo_url"),
+                "primary_thumb": movie_doc.get("primary_thumb"),
             }
             generated_poster = await generate_movie_poster(poster_details)
             if generated_poster:
