@@ -24,17 +24,38 @@ async def _get_session():
         _session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15))
     return _session
 
-async def _download_image(url: str) -> Image.Image | None:
-    if not url:
+async def _download_image(source) -> Image.Image | None:
+    if not source:
         return None
     try:
-        session = await _get_session()
-        async with session.get(url) as resp:
-            if resp.status == 200:
-                data = await resp.read()
-                return Image.open(BytesIO(data)).convert("RGBA")
+        if isinstance(source, Image.Image):
+            return source.convert("RGBA")
+        if isinstance(source, BytesIO):
+            source.seek(0)
+            return Image.open(source).convert("RGBA")
+        if isinstance(source, bytes):
+            return Image.open(BytesIO(source)).convert("RGBA")
+        if isinstance(source, str):
+            if os.path.isfile(source):
+                return Image.open(source).convert("RGBA")
+            if source.startswith("http://") or source.startswith("https://"):
+                session = await _get_session()
+                async with session.get(source) as resp:
+                    if resp.status == 200:
+                        data = await resp.read()
+                        return Image.open(BytesIO(data)).convert("RGBA")
+                return None
+            try:
+                from dreamxbotz.Bot import dreamxbotz
+                dl = await asyncio.wait_for(dreamxbotz.download_media(source, in_memory=True), timeout=5.0)
+                if dl and isinstance(dl, BytesIO):
+                    dl.seek(0)
+                    return Image.open(dl).convert("RGBA")
+            except Exception as e:
+                logger.warning(f"Failed downloading telegram file_id thumbnail: {e}")
+                return None
     except Exception as e:
-        logger.error(f"Error downloading image from {url}: {e}")
+        logger.error(f"Error loading image from source: {e}")
     return None
 
 def _get_font(path: str, size: int):
@@ -152,16 +173,21 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         width, height = 1280, 720
         canvas = Image.new("RGBA", (width, height), (15, 15, 20, 255))
 
-        # 1. Fetch images asynchronously
+        # 1. Fetch images asynchronously (including primary_thumb fallback)
+        primary_thumb = details.get("primary_thumb")
         poster_url = details.get("poster_url")
         backdrop_url = details.get("backdrop_url") or poster_url
         logo_url = details.get("logo_url")
 
         poster_img, backdrop_img, logo_img = await asyncio.gather(
-            _download_image(poster_url),
-            _download_image(backdrop_url),
+            _download_image(poster_url or primary_thumb),
+            _download_image(backdrop_url or poster_url or primary_thumb),
             _download_image(logo_url)
         )
+        if not poster_img and primary_thumb:
+            poster_img = await _download_image(primary_thumb)
+        if not backdrop_img:
+            backdrop_img = poster_img
 
         # 2. Draw Backdrop with custom gradient so background image is prominent and legible
         if backdrop_img:

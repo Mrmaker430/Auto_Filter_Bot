@@ -23,6 +23,38 @@ def test_generate_movie_poster_mock():
     assert buf is not None
     assert len(buf.getvalue()) > 0
 
+def test_extract_title_and_year():
+    from plugins.Dreamxfutures.Imdbposter import _extract_title_and_year
+    t, y = _extract_title_and_year("Inception 2010 1080p")
+    assert t == "Inception 1080p"
+    assert y == 2010
+
+    t2, y2 = _extract_title_and_year("Interstellar (2014) WEB-DL")
+    assert t2 == "Interstellar WEB-DL"
+    assert y2 == 2014
+
+def test_generate_movie_poster_with_primary_thumb():
+    from PIL import Image
+    from io import BytesIO
+
+    # Create a dummy image buffer for primary_thumb
+    dummy_img = Image.new("RGB", (300, 450), color=(0, 100, 200))
+    thumb_buf = BytesIO()
+    dummy_img.save(thumb_buf, format="JPEG")
+    thumb_buf.seek(0)
+
+    details = {
+        'title': 'Local Primary Thumb Movie',
+        'rating': 8.5,
+        'year': 2023,
+        'genres': ['Drama'],
+        'plot': 'Plot using primary thumbnail.',
+        'primary_thumb': thumb_buf,
+    }
+    buf = asyncio.run(generate_movie_poster(details, '@cholochhitro'))
+    assert buf is not None
+    assert len(buf.getvalue()) > 0
+
 def test_get_or_generate_cover(monkeypatch):
     from io import BytesIO
     from utils import get_or_generate_cover, POSTER_CACHE

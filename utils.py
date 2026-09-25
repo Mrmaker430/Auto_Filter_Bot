@@ -1192,18 +1192,21 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
                 logger.warning(f"Timeout fetching details for cover of '{clean_title}'")
                 details = None
 
-        if details and (details.get("poster_url") or details.get("backdrop_url")):
-            poster_details = {
-                "title": details.get("title") or clean_title,
-                "rating": details.get("rating", "N/A"),
-                "year": details.get("year", ""),
-                "tag": details.get("tag", "#MOVIE"),
-                "genres": details.get("genres", "N/A"),
-                "plot": details.get("plot", ""),
-                "poster_url": details.get("poster_url"),
-                "backdrop_url": details.get("backdrop_url") or details.get("poster_url"),
-                "logo_url": details.get("logo_url"),
-            }
+        primary_thumb = movie_doc.get("primary_thumb") if movie_doc else None
+        poster_details = {
+            "title": (details.get("title") if details else None) or (movie_doc.get("title") if movie_doc else None) or clean_title,
+            "rating": (details.get("rating") if details else None) or (movie_doc.get("rating") if movie_doc else "N/A"),
+            "year": (details.get("year") if details else None) or (movie_doc.get("year") if movie_doc else ""),
+            "tag": (details.get("tag") if details else None) or (movie_doc.get("tag") if movie_doc else "#MOVIE"),
+            "genres": (details.get("genres") if details else None) or (movie_doc.get("genres") if movie_doc else "N/A"),
+            "plot": (details.get("plot") if details else None) or (movie_doc.get("plot") if movie_doc else ""),
+            "poster_url": details.get("poster_url") if details else (movie_doc.get("poster_url") if movie_doc else None),
+            "backdrop_url": (details.get("backdrop_url") or details.get("poster_url")) if details else (movie_doc.get("backdrop_url") or movie_doc.get("poster_url") if movie_doc else None),
+            "logo_url": details.get("logo_url") if details else (movie_doc.get("logo_url") if movie_doc else None),
+            "primary_thumb": primary_thumb,
+        }
+
+        if poster_details.get("poster_url") or poster_details.get("backdrop_url") or poster_details.get("primary_thumb"):
             generated_poster = await generate_movie_poster(poster_details)
             if generated_poster:
                 poster_bytes = generated_poster.getvalue()
@@ -1214,11 +1217,11 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
                 buf.name = "cover.jpg"
                 buf.seek(0)
                 return buf
-            elif details.get("poster_url"):
+            elif poster_details.get("poster_url"):
                 if len(POSTER_CACHE) >= MAX_POSTER_CACHE_SIZE:
                     POSTER_CACHE.pop(next(iter(POSTER_CACHE)))
-                POSTER_CACHE[cache_key] = details["poster_url"]
-                return details["poster_url"]
+                POSTER_CACHE[cache_key] = poster_details["poster_url"]
+                return poster_details["poster_url"]
 
     except Exception as e:
         logger.warning(f"Error generating cover for '{file_name}': {e}")

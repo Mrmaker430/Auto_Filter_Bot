@@ -87,13 +87,16 @@ def _list_to_str_tmdb(data_list, limit=10, key=None):
 
 
 def _extract_title_and_year(query: str):
-    """Extract title and optional year from a search query string."""
-    match = re.search(r'^(.*?)(?:\s+(\d{4}))?$', query.strip())
-    if match:
-        title, year_str = match.groups()
-        year = int(year_str) if year_str and year_str.isdigit() else None
-        return title.strip(), year
-    return query.strip(), None
+    """Extract title and optional 4-digit release year from a search query string."""
+    clean_q = query.strip()
+    year_match = re.search(r'(?<!\d)(19\d{2}|20\d{2})(?!\d)', clean_q)
+    if year_match:
+        year = int(year_match.group(1))
+        # Remove year and surrounding brackets/parentheses
+        title = re.sub(r'\(?\b' + str(year) + r'\b\)?', '', clean_q).strip()
+        title = re.sub(r'\s+', ' ', title).strip()
+        return title if title else clean_q, year
+    return clean_q, None
 
 
 async def _tmdb_get(path, params=None, api_key=None):
@@ -157,8 +160,9 @@ async def _search_media_id(query: str, api_key=None):
     scored_results = []
     for r in multi_results:
         # Score the string matched against the ORIGINAL title, not the shortened target_query
-        ratio = get_ratio(r.get('title') or r.get('name'), title)
-        if ratio >= 0.5:   # Lowered from 0.6 to 0.5 to allow for dropped/modified words
+        res_title = r.get('title') or r.get('name')
+        ratio = get_ratio(res_title, title)
+        if ratio >= 0.5:
             scored_results.append((r, ratio))
 
     if not scored_results:
@@ -175,9 +179,18 @@ async def _search_media_id(query: str, api_key=None):
             rd_date = datetime.strptime(rd_str, '%Y-%m-%d').date()
         except ValueError:
             continue
+
+        # Calculate year match score multiplier
+        year_bonus = 0.0
         if year:
-            if abs(rd_date.year - year) > 1:
+            year_diff = abs(rd_date.year - year)
+            if year_diff > 2:
                 continue
+            elif year_diff == 0:
+                year_bonus = 0.25
+            elif year_diff == 1:
+                year_bonus = 0.1
+
         if mtype == 'movie':
             try:
                 details = await _fetch_media_details(mtype, r['id'], api_key=api_key)
@@ -188,7 +201,13 @@ async def _search_media_id(query: str, api_key=None):
                     continue
             except Exception:
                 continue
-        candidate = {'type': mtype, 'id': r['id'], 'date': rd_date, 'score': r.get('popularity', 0), 'ratio': ratio}
+        candidate = {
+            'type': mtype,
+            'id': r['id'],
+            'date': rd_date,
+            'score': r.get('popularity', 0),
+            'ratio': ratio + year_bonus
+        }
         (candidates_upcoming if rd_date > today else candidates_past).append(candidate)
 
     candidates_past.sort(key=lambda x: (x['ratio'], x['date'], x['score']), reverse=True)
