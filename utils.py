@@ -1168,7 +1168,7 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
                 movie_doc = None
 
         details = None
-        if movie_doc:
+        if movie_doc and (movie_doc.get("poster_url") or movie_doc.get("backdrop_url")):
             details = {
                 "title": movie_doc.get("title") or clean_title,
                 "rating": movie_doc.get("rating", "N/A"),
@@ -1183,11 +1183,11 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
         else:
             try:
                 if TMDB_POSTER:
-                    details = await asyncio.wait_for(get_movie_detailsx(clean_title), timeout=3.5)
+                    details = await asyncio.wait_for(get_movie_detailsx(clean_title), timeout=5.0)
                     if not details or details.get("error") or (not details.get("poster_url") and not details.get("backdrop_url")):
-                        details = await asyncio.wait_for(get_movie_details(clean_title), timeout=3.5) or {}
+                        details = await asyncio.wait_for(get_movie_details(clean_title), timeout=5.0) or {}
                 else:
-                    details = await asyncio.wait_for(get_movie_details(clean_title), timeout=3.5) or {}
+                    details = await asyncio.wait_for(get_movie_details(clean_title), timeout=5.0) or {}
             except asyncio.TimeoutError:
                 logger.warning(f"Timeout fetching details for cover of '{clean_title}'")
                 details = None

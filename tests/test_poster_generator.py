@@ -23,6 +23,65 @@ def test_generate_movie_poster_mock():
     assert buf is not None
     assert len(buf.getvalue()) > 0
 
+def test_dreamxbotz_clean_title():
+    from database.ia_filterdb import dreamxbotz_clean_title
+
+    assert asyncio.run(dreamxbotz_clean_title('Deadpool.1080p.WEBRip.mkv')) == 'Deadpool'
+    assert asyncio.run(dreamxbotz_clean_title('Sample.Movie.2024.1080p.mkv')) == 'Sample Movie 2024'
+    assert asyncio.run(dreamxbotz_clean_title('Interstellar.2014.2160p.UHD.mkv')) == 'Interstellar 2014'
+
+def test_get_movie_details_omdb(monkeypatch):
+    from plugins.Dreamxfutures.Imdbposter import get_movie_details_omdb
+
+    class MockResponse:
+        def __init__(self, json_data, status=200):
+            self._json_data = json_data
+            self.status = status
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            pass
+
+        async def json(self):
+            return self._json_data
+
+    class MockSession:
+        def get(self, url, params=None):
+            return MockResponse({
+                "Title": "Guardians of the Galaxy: Vol. 2",
+                "Year": "2017",
+                "Rated": "PG-13",
+                "Released": "05 May 2017",
+                "Runtime": "136 min",
+                "Genre": "Action, Adventure, Comedy",
+                "Director": "James Gunn",
+                "Writer": "James Gunn",
+                "Actors": "Chris Pratt, Zoe Saldaña",
+                "Plot": "The Guardians struggle...",
+                "Language": "English",
+                "Country": "United States",
+                "Poster": "https://m.media-amazon.com/images/M/test._V1_SX300.jpg",
+                "imdbRating": "7.6",
+                "imdbVotes": "828,114",
+                "imdbID": "tt3896198",
+                "Type": "movie",
+                "Response": "True"
+            })
+
+    async def mock_get_session():
+        return MockSession()
+
+    monkeypatch.setattr('plugins.Dreamxfutures.Imdbposter.get_session', mock_get_session)
+
+    res = asyncio.run(get_movie_details_omdb('tt3896198'))
+    assert res is not None
+    assert res['title'] == 'Guardians of the Galaxy: Vol. 2'
+    assert res['poster_url'] == 'https://m.media-amazon.com/images/M/test._V1_SX1280.jpg'
+    assert res['rating'] == 7.6
+    assert res['imdb_id'] == 'tt3896198'
+
 def test_extract_title_and_year():
     from plugins.Dreamxfutures.Imdbposter import _extract_title_and_year
     t, y = _extract_title_and_year("Inception 2010 1080p")
