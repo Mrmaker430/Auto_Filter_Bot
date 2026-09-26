@@ -364,7 +364,9 @@ async def dreamxbotz_fetch_media(limit: int) -> List[dict]:
 
 async def dreamxbotz_clean_title(filename: str, is_series: bool = False) -> str:
     try:
-        year_match = re.search(r"^(.*?(\d{4}|\(\d{4}\)))", filename, re.IGNORECASE)
+        import os
+        base = os.path.splitext(filename)[0]
+        year_match = re.search(r"^(.*?(?:19\d{2}|20\d{2}))", base, re.IGNORECASE)
         if year_match:
             title = year_match.group(1).replace("(", "").replace(")", "")
             return (
@@ -379,7 +381,7 @@ async def dreamxbotz_clean_title(filename: str, is_series: bool = False) -> str:
         if is_series:
             season_match = re.search(
                 r"(.*?)(?:S(\d{1,2})|Season\s*(\d+)|Season(\d+))(?:\s*Combined)?",
-                filename,
+                base,
                 re.IGNORECASE,
             )
             if season_match:
@@ -399,7 +401,13 @@ async def dreamxbotz_clean_title(filename: str, is_series: bool = False) -> str:
                     .title()
                 )
                 return f"{title} S{int(season):02}"
-        title = filename
+        title = base
+        title = re.sub(
+            r"\b(1080p|720p|480p|360p|2160p|4k|web-?dl|bluray|hdrip|webrip|dvdrip|x264|x265|h264|hevc|10bit|aac)\b",
+            "",
+            title,
+            flags=re.IGNORECASE,
+        )
         return (
             re.sub(
                 r"(?:@[^ \n\r\t.,:;!?()\[\]{}<>\\\/\"'=_%]+|[._\-\[\]@()]+)", " ", title
