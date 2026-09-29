@@ -1193,6 +1193,7 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
                 details = None
 
         primary_thumb = movie_doc.get("primary_thumb") if movie_doc else None
+        ott_plat = movie_doc.get("ott_platform") if movie_doc else (details.get("ott_platform") if details else None)
         poster_details = {
             "title": (details.get("title") if details else None) or (movie_doc.get("title") if movie_doc else None) or clean_title,
             "rating": (details.get("rating") if details else None) or (movie_doc.get("rating") if movie_doc else "N/A"),
@@ -1204,6 +1205,7 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
             "backdrop_url": (details.get("backdrop_url") or details.get("poster_url")) if details else (movie_doc.get("backdrop_url") or movie_doc.get("poster_url") if movie_doc else None),
             "logo_url": details.get("logo_url") if details else (movie_doc.get("logo_url") if movie_doc else None),
             "primary_thumb": primary_thumb,
+            "ott_platform": ott_plat,
         }
 
         if poster_details.get("poster_url") or poster_details.get("backdrop_url") or poster_details.get("primary_thumb"):

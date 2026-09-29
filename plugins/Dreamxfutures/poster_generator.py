@@ -133,6 +133,125 @@ def _wrap_text(text: str, font: ImageFont.ImageFont, max_width: int, max_lines: 
 
     return lines
 
+OTT_BRAND_STYLES = {
+    "NETFLIX": {"bg": (229, 9, 20, 255), "text": (255, 255, 255, 255), "label": "NETFLIX"},
+    "AMAZON PRIME VIDEO": {"bg": (0, 168, 225, 255), "text": (255, 255, 255, 255), "label": "prime video"},
+    "PRIME VIDEO": {"bg": (0, 168, 225, 255), "text": (255, 255, 255, 255), "label": "prime video"},
+    "PRIME": {"bg": (0, 168, 225, 255), "text": (255, 255, 255, 255), "label": "prime video"},
+    "DISNEY+ HOTSTAR": {"bg": (0, 20, 49, 255), "text": (255, 255, 255, 255), "label": "Disney+ hotstar", "border": (255, 215, 0, 255)},
+    "HOTSTAR": {"bg": (0, 20, 49, 255), "text": (255, 255, 255, 255), "label": "Disney+ hotstar", "border": (255, 215, 0, 255)},
+    "JIOHOTSTAR": {"bg": (0, 20, 49, 255), "text": (255, 255, 255, 255), "label": "JioHotstar", "border": (255, 215, 0, 255)},
+    "SONYLIV": {"bg": (26, 16, 47, 255), "text": (255, 255, 255, 255), "label": "SonyLIV", "border": (255, 102, 0, 255)},
+    "SONY": {"bg": (26, 16, 47, 255), "text": (255, 255, 255, 255), "label": "SonyLIV", "border": (255, 102, 0, 255)},
+    "ZEE5": {"bg": (130, 36, 227, 255), "text": (255, 255, 255, 255), "label": "ZEE5"},
+    "JIOCINEMA": {"bg": (225, 0, 120, 255), "text": (255, 255, 255, 255), "label": "JioCinema"},
+    "AHA": {"bg": (255, 82, 0, 255), "text": (255, 255, 255, 255), "label": "aha"},
+    "APPLE TV+": {"bg": (20, 20, 20, 255), "text": (255, 255, 255, 255), "label": "tv+", "border": (200, 200, 200, 255)},
+    "APPLE": {"bg": (20, 20, 20, 255), "text": (255, 255, 255, 255), "label": "tv+", "border": (200, 200, 200, 255)},
+    "HBO MAX": {"bg": (88, 34, 180, 255), "text": (255, 255, 255, 255), "label": "MAX"},
+    "HBO": {"bg": (88, 34, 180, 255), "text": (255, 255, 255, 255), "label": "MAX"},
+    "MAX": {"bg": (88, 34, 180, 255), "text": (255, 255, 255, 255), "label": "MAX"},
+    "PARAMOUNT+": {"bg": (0, 100, 255, 255), "text": (255, 255, 255, 255), "label": "Paramount+"},
+    "PARAMOUNT": {"bg": (0, 100, 255, 255), "text": (255, 255, 255, 255), "label": "Paramount+"},
+    "HULU": {"bg": (28, 231, 131, 255), "text": (0, 0, 0, 255), "label": "hulu"},
+    "PEACOCK": {"bg": (0, 0, 0, 255), "text": (255, 255, 255, 255), "label": "peacock", "border": (0, 200, 200, 255)},
+    "HOICHOI": {"bg": (255, 204, 0, 255), "text": (200, 0, 0, 255), "label": "hoichoi"},
+    "SUN NXT": {"bg": (237, 28, 36, 255), "text": (255, 255, 255, 255), "label": "SUN NXT"},
+    "SUNNXT": {"bg": (237, 28, 36, 255), "text": (255, 255, 255, 255), "label": "SUN NXT"},
+    "ALTBALAJI": {"bg": (153, 0, 0, 255), "text": (255, 255, 255, 255), "label": "ALTBalaji"},
+    "EROS NOW": {"bg": (216, 0, 95, 255), "text": (255, 255, 255, 255), "label": "EROS NOW"},
+    "VOOT": {"bg": (100, 40, 145, 255), "text": (255, 255, 255, 255), "label": "voot"},
+    "CRUNCHYROLL": {"bg": (255, 102, 0, 255), "text": (255, 255, 255, 255), "label": "crunchyroll"},
+    "VIKI": {"bg": (0, 174, 239, 255), "text": (255, 255, 255, 255), "label": "Viki"},
+    "YOUTUBE PREMIUM": {"bg": (255, 0, 0, 255), "text": (255, 255, 255, 255), "label": "YouTube"}
+}
+
+def _extract_ott_list(details: dict) -> list[str]:
+    raw = (
+        details.get("ott_platform")
+        or details.get("ott")
+        or details.get("otts")
+        or details.get("custom_otts")
+        or details.get("ott_platforms")
+    )
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        items = raw
+    else:
+        import re
+        items = re.split(r"[|,\n]+", str(raw))
+
+    result = []
+    for item in items:
+        clean = str(item).strip()
+        if clean and clean.upper() not in ("N/A", "NONE"):
+            result.append(clean)
+    return result
+
+def _draw_ott_badges(draw: ImageDraw.ImageDraw, ott_list: list[str], canvas_w: int, font: ImageFont.ImageFont):
+    if not ott_list:
+        return
+
+    curr_x = canvas_w - 25  # Top right corner right margin
+    y = 25                  # Top right corner y position
+    badge_h = 32
+    radius = 12
+
+    for ott in ott_list:
+        key = ott.upper().strip()
+        style = OTT_BRAND_STYLES.get(key)
+        if not style:
+            # Try to match substring key in OTT_BRAND_STYLES
+            for k, v in OTT_BRAND_STYLES.items():
+                if k in key or key in k:
+                    style = v
+                    break
+
+        if not style:
+            style = {
+                "bg": (25, 25, 30, 240),
+                "text": (255, 255, 255, 255),
+                "label": ott.upper()
+            }
+
+        label_text = style.get("label", ott)
+        bg_col = style.get("bg", (25, 25, 30, 240))
+        text_col = style.get("text", (255, 255, 255, 255))
+        border_col = style.get("border")
+
+        bbox = font.getbbox(label_text)
+        text_w = bbox[2] - bbox[0]
+        padding_h = 14
+        badge_w = max(55, text_w + (padding_h * 2))
+
+        box_x1 = curr_x - badge_w
+        box_y1 = y
+        box_x2 = curr_x
+        box_y2 = y + badge_h
+
+        if box_x1 < 250:
+            break
+
+        _draw_rounded_rectangle(
+            draw,
+            (box_x1, box_y1, box_x2, box_y2),
+            radius=radius,
+            fill=bg_col,
+            outline=border_col,
+            width=2 if border_col else 1
+        )
+
+        draw.text(
+            (box_x1 + badge_w // 2, box_y1 + badge_h // 2),
+            label_text,
+            font=font,
+            fill=text_col,
+            anchor="mm"
+        )
+
+        curr_x = box_x1 - 10  # Move left for next OTT badge
+
 def _format_runtime(runtime_val) -> str:
     if not runtime_val or str(runtime_val).upper() in ("N/A", "NONE"):
         return ""
@@ -168,6 +287,7 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         - backdrop_url: str
         - logo_url: str
         - runtime: str/int
+        - ott_platform: str / list
     """
     try:
         width, height = 1280, 720
@@ -189,31 +309,50 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         if not backdrop_img:
             backdrop_img = poster_img
 
-        # 2. Draw Backdrop with custom gradient so background image is prominent and legible
+        # 2. Draw Backdrop: ensure backdrop is distinct from mini poster & clearly visible top to bottom, right to left
+        is_same_as_poster = (
+            poster_img and backdrop_img and
+            (backdrop_url == poster_url or backdrop_img is poster_img or backdrop_img.size == poster_img.size)
+        )
+
         if backdrop_img:
-            bg_aspect = backdrop_img.width / backdrop_img.height
-            target_h = height
-            target_w = int(height * bg_aspect)
-            if target_w < width:
-                target_w = width
-                target_h = int(width / bg_aspect)
+            if is_same_as_poster:
+                # Apply strong Gaussian blur to produce an ambient background canvas
+                blurred_bg = backdrop_img.filter(ImageFilter.GaussianBlur(25))
+                bg_aspect = blurred_bg.width / blurred_bg.height
+                target_h = height
+                target_w = int(height * bg_aspect)
+                if target_w < width:
+                    target_w = width
+                    target_h = int(width / bg_aspect)
 
-            resized_bg = backdrop_img.resize((target_w, target_h), Image.LANCZOS)
-            bg_crop = resized_bg.crop(((target_w - width) // 2, 0, (target_w + width) // 2, height))
-            canvas.paste(bg_crop, (0, 0))
+                resized_bg = blurred_bg.resize((target_w, target_h), Image.LANCZOS)
+                bg_crop = resized_bg.crop(((target_w - width) // 2, (target_h - height) // 2, (target_w + width) // 2, (target_h + height) // 2))
+                canvas.paste(bg_crop, (0, 0))
+            else:
+                bg_aspect = backdrop_img.width / backdrop_img.height
+                target_h = height
+                target_w = int(height * bg_aspect)
+                if target_w < width:
+                    target_w = width
+                    target_h = int(width / bg_aspect)
 
-        # Soft overlay gradient: Darker towards bottom where text/cards are placed, lighter top
+                resized_bg = backdrop_img.resize((target_w, target_h), Image.LANCZOS)
+                bg_crop = resized_bg.crop(((target_w - width) // 2, 0, (target_w + width) // 2, height))
+                canvas.paste(bg_crop, (0, 0))
+
+        # Light, subtle overlay gradient so backdrop image is clearly visible top-to-bottom and right-to-left
         gradient = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         draw_grad = ImageDraw.Draw(gradient)
 
-        for y in range(height):
-            if y < 200:
-                alpha = int(80 * (y / 200))
-            elif y < 400:
-                alpha = int(80 + 100 * ((y - 200) / 200))
+        for y_i in range(height):
+            if y_i < 200:
+                alpha = int(25 * (y_i / 200))
+            elif y_i < 400:
+                alpha = int(25 + 45 * ((y_i - 200) / 200))
             else:
-                alpha = int(180 + 55 * ((y - 400) / 320))
-            draw_grad.line([(0, y), (width, y)], fill=(5, 5, 10, min(235, alpha)))
+                alpha = int(70 + 55 * ((y_i - 400) / 320))  # Max alpha ~125
+            draw_grad.line([(0, y_i), (width, y_i)], fill=(5, 5, 10, alpha))
 
         canvas = Image.alpha_composite(canvas, gradient)
         draw = ImageDraw.Draw(canvas)
@@ -222,7 +361,12 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         font_rating_star = _get_font(SANS_BOLD_FONT_PATH, 26)
         font_rating_num = _get_font(SANS_BOLD_FONT_PATH, 26)
         font_badge = _get_font(SANS_BOLD_FONT_PATH, 18)
+        font_ott_badge = _get_font(SANS_BOLD_FONT_PATH, 16)
         font_plot = _get_font(SANS_FONT_PATH, 21)
+
+        # Draw OTT Badges at Top-Right Corner
+        ott_list = _extract_ott_list(details)
+        _draw_ott_badges(draw, ott_list, width, font_ott_badge)
 
         # 3. Bottom Left Portrait Poster Card
         card_x, card_y = 55, 330

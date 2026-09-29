@@ -23,6 +23,52 @@ def test_generate_movie_poster_mock():
     assert buf is not None
     assert len(buf.getvalue()) > 0
 
+def test_extract_ott_list():
+    from plugins.Dreamxfutures.poster_generator import _extract_ott_list
+
+    assert _extract_ott_list({'ott_platform': 'Netflix | SonyLiv'}) == ['Netflix', 'SonyLiv']
+    assert _extract_ott_list({'ott': 'Amazon Prime Video, Zee5'}) == ['Amazon Prime Video', 'Zee5']
+    assert _extract_ott_list({'custom_otts': ['Hotstar', 'Apple TV+']}) == ['Hotstar', 'Apple TV+']
+    assert _extract_ott_list({'ott_platform': 'N/A'}) == []
+
+def test_generate_movie_poster_with_ott_badges():
+    details = {
+        'title': 'OTT Movie Test',
+        'rating': 9.0,
+        'year': 2025,
+        'genres': ['Action', 'Thriller'],
+        'plot': 'Movie with OTT badges in top right corner.',
+        'runtime': '150 min',
+        'ott_platform': 'Netflix | Disney+ Hotstar | Zee5',
+    }
+    buf = asyncio.run(generate_movie_poster(details, '@cholochhitro'))
+    assert buf is not None
+    assert len(buf.getvalue()) > 0
+
+def test_generate_movie_poster_same_backdrop_and_poster():
+    from PIL import Image
+    from io import BytesIO
+
+    dummy_img = Image.new("RGB", (300, 450), color=(100, 50, 200))
+    thumb_buf = BytesIO()
+    dummy_img.save(thumb_buf, format="JPEG")
+    thumb_buf.seek(0)
+
+    details = {
+        'title': 'Same Backdrop Poster',
+        'rating': 8.2,
+        'year': 2025,
+        'genres': ['Comedy'],
+        'plot': 'Testing when backdrop_url equals poster_url.',
+        'poster_url': 'http://example.com/same.jpg',
+        'backdrop_url': 'http://example.com/same.jpg',
+        'primary_thumb': thumb_buf,
+        'ott_platform': 'Netflix',
+    }
+    buf = asyncio.run(generate_movie_poster(details, '@cholochhitro'))
+    assert buf is not None
+    assert len(buf.getvalue()) > 0
+
 def test_dreamxbotz_clean_title():
     from database.ia_filterdb import dreamxbotz_clean_title
 
