@@ -393,6 +393,14 @@ async def send_movie_update(bot, base_name):
                     style=enums.ButtonStyle.SUCCESS
                 )
             ]])
+            all_ott_platforms = set()
+            if movie_doc.get("ott_platform") and movie_doc.get("ott_platform") != "N/A":
+                all_ott_platforms.update(p.strip() for p in movie_doc["ott_platform"].split("|") if p.strip())
+            for file in movie_doc.get("files", []):
+                if file.get("ott_platform") and file["ott_platform"] != "N/A":
+                    all_ott_platforms.update(p.strip() for p in file["ott_platform"].split("|") if p.strip())
+            ott_str = " | ".join(sorted(all_ott_platforms)) if all_ott_platforms else "N/A"
+
             poster_details = {
                 "title": movie_doc.get("title") or base_name,
                 "rating": movie_doc.get("rating", "N/A"),
@@ -404,6 +412,7 @@ async def send_movie_update(bot, base_name):
                 "backdrop_url": movie_doc.get("backdrop_url") or movie_doc.get("poster_url"),
                 "logo_url": movie_doc.get("logo_url"),
                 "primary_thumb": movie_doc.get("primary_thumb"),
+                "ott_platform": ott_str,
             }
             generated_poster = await generate_movie_poster(poster_details)
             if generated_poster:

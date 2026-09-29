@@ -189,6 +189,12 @@ async def _build_final_post_content(session: dict, session_id: int):
     if not movie_details:
         return None, None, None
 
+    if session.get("custom_otts"):
+        movie_details["ott_platform"] = session["custom_otts"]
+        session["generated_poster"] = await generate_movie_poster(movie_details)
+        if session.get("use_landscape", True):
+            session["custom_poster"] = session["generated_poster"]
+
     if not session.get("generated_poster"):
         session["generated_poster"] = await generate_movie_poster(movie_details)
         if session["generated_poster"] and not session.get("custom_poster"):

@@ -590,10 +590,19 @@ async def get_movie_detailsx(query, id=False, file=None):
     backdrops = data.get('images', {}).get('backdrops', {})
     original_language = data.get('images', {}).get('original_language')
     backdrop_url = None
-    for key in ('en', original_language, 'xx', 'no_lang'):
+    for key in ('en', original_language, 'xx', 'no_lang', 'all'):
         if key and backdrops.get(key):
-            backdrop_url = backdrops[key][0]
-            break
+            # Try to pick a backdrop URL
+            for b_img in backdrops[key]:
+                if b_img and b_img != poster_url:
+                    backdrop_url = b_img
+                    break
+            if backdrop_url:
+                break
+            if not backdrop_url and backdrops[key]:
+                backdrop_url = backdrops[key][0]
+                break
+
     details['backdrop_url'] = backdrop_url.replace("/original/", "/w1280/") if backdrop_url else None
 
     logos = data.get('images', {}).get('logos', {})
