@@ -1,4 +1,3 @@
-# Core bot
 kurigram
 tgcrypto
 pymongo==4.13.2
@@ -15,6 +14,7 @@ pymediainfo-pyrofork
 
 # OCR and Image Processing
 bangla-ocr
+indicphotoocr
 
 # Other tools
 yt-dlp
