@@ -574,89 +574,129 @@ async def get_movie_details_omdb(query, id=False, file=None):
 
 async def get_movie_detailsx(query, id=False, file=None):
     """
-    Primary movie details fetcher using direct TMDB API calls with OMDB fallback.
-    Falls back to OMDB then IMDb-based get_movie_details() on failure.
+    Primary movie details fetcher: fetches details and mini poster from OMDB,
+    and fetches landscape backdrop image and logo from TMDB.
+    Falls back to TMDB or IMDb on failure.
     """
     q = str(query).strip()
-    data = None
+    omdb_data = None
+    tmdb_data = None
+
     try:
-        data = await _fetch_tmdb_data(q, api_key=TMDB_API_KEY or None)
+        omdb_task = asyncio.create_task(_fetch_omdb_data(q, id=id))
+        tmdb_task = asyncio.create_task(_fetch_tmdb_data(q, api_key=TMDB_API_KEY or None))
+        omdb_res, tmdb_res = await asyncio.gather(omdb_task, tmdb_task, return_exceptions=True)
+        if not isinstance(omdb_res, Exception):
+            omdb_data = omdb_res
+        else:
+            logger.error(f"OMDB call error: {omdb_res}")
+
+        if not isinstance(tmdb_res, Exception):
+            tmdb_data = tmdb_res
+        else:
+            logger.error(f"TMDB call error: {tmdb_res}")
     except Exception as e:
-        logger.error(f"TMDB direct call failed: {e}")
+        logger.error(f"Error fetching movie details in get_movie_detailsx: {e}")
 
-    # If TMDB failed or returned no poster_url, try OMDB API
-    if not data or not (data.get("poster_url") or data.get("images", {}).get("posters")):
-        try:
-            omdb_data = await _fetch_omdb_data(q, id=id)
-            if omdb_data and omdb_data.get("poster_url"):
-                return omdb_data
-        except Exception as e:
-            logger.error(f"OMDB call failed: {e}")
+    # If OMDB returned details, enrich with TMDB backdrop and logo
+    if omdb_data and isinstance(omdb_data, dict):
+        if tmdb_data and isinstance(tmdb_data, dict):
+            backdrops = tmdb_data.get('images', {}).get('backdrops', {})
+            logos = tmdb_data.get('images', {}).get('logos', {})
+            original_language = tmdb_data.get('images', {}).get('original_language')
 
-    if not data:
-        logger.warning(f"TMDB & OMDB returned no results for '{q}' → switching to IMDb fallback")
-        return await get_movie_details(q)
+            backdrop_url = tmdb_data.get('backdrop_url')
+            if not backdrop_url:
+                for key in ('en', original_language, 'xx', 'no_lang', 'all'):
+                    if key and backdrops.get(key):
+                        for b_img in backdrops[key]:
+                            if b_img and b_img != omdb_data.get('poster_url'):
+                                backdrop_url = b_img
+                                break
+                        if backdrop_url:
+                            break
+                        if not backdrop_url and backdrops[key]:
+                            backdrop_url = backdrops[key][0]
+                            break
 
-    # Normalize fields
-    details = {}
-    details['title'] = data.get('title') or data.get('localized_title')
-    details['year'] = (data.get('year', 0)) if data.get('year') else None
-    details['release_date'] = data.get('release_date')
-    details['rating'] = round(float(data.get('rating', 0)), 1) if data.get('rating') is not None else None
-    details['votes'] = int(data.get('votes', 0))
-    details['runtime'] = data.get('runtime')
-    details['certificates'] = data.get('certificates')
-    details['tmdb_url'] = data.get('url')
-    
-    for key in ('genres', 'languages', 'countries'):
-        raw = data.get(key)
-        details[key] = [s.strip() for s in raw.split(',')] if raw else []
-    for role in ('director', 'writer', 'producer', 'composer', 'cinematographer', 'cast'):
-        raw = data.get(role)
-        details[role] = [s.strip() for s in raw.split(',')] if raw else []
-        
-    details['plot'] = data.get('plot')
-    details['tagline'] = data.get('tagline')
-    details['box_office'] = (data.get('box_office', 0)) if data.get('box_office') else None
-    raw_dist = data.get('distributors')
-    details['distributors'] = [d.strip() for d in raw_dist.split(',')] if raw_dist else []
-    details['imdb_id'] = data.get('imdb_id')
-    details['tmdb_id'] = data.get('tmdb_id')
-    
-    posters = data.get('images', {}).get('posters', {})
-    original_language = data.get('images', {}).get('original_language')
-    poster_url = data.get('poster_url')
-    if not poster_url:
-        for key in ('en', original_language, 'xx'):
-            if key and posters.get(key):
-                poster_url = posters[key][0]
-                break
-    details['poster_url'] = poster_url.replace("/original/", "/w1280/") if poster_url else None
+            logo_url = tmdb_data.get('logo_url')
+            if not logo_url:
+                for key in ('en', original_language, 'xx', 'no_lang', 'all'):
+                    if key and logos.get(key):
+                        logo_url = logos[key][0]
+                        break
 
-    backdrops = data.get('images', {}).get('backdrops', {})
-    original_language = data.get('images', {}).get('original_language')
-    backdrop_url = None
-    for key in ('en', original_language, 'xx', 'no_lang', 'all'):
-        if key and backdrops.get(key):
-            # Try to pick a backdrop URL
-            for b_img in backdrops[key]:
-                if b_img and b_img != poster_url:
-                    backdrop_url = b_img
-                    break
             if backdrop_url:
+                omdb_data['backdrop_url'] = backdrop_url
+            if logo_url:
+                omdb_data['logo_url'] = logo_url
+            omdb_data['tmdb_id'] = tmdb_data.get('tmdb_id')
+            omdb_data['tmdb_url'] = tmdb_data.get('url')
+
+        return omdb_data
+
+    # If OMDB failed but TMDB succeeded, return TMDB normalized details
+    if tmdb_data and isinstance(tmdb_data, dict):
+        details = {}
+        details['title'] = tmdb_data.get('title') or tmdb_data.get('localized_title')
+        details['year'] = (tmdb_data.get('year', 0)) if tmdb_data.get('year') else None
+        details['release_date'] = tmdb_data.get('release_date')
+        details['rating'] = round(float(tmdb_data.get('rating', 0)), 1) if tmdb_data.get('rating') is not None else None
+        details['votes'] = int(tmdb_data.get('votes', 0))
+        details['runtime'] = tmdb_data.get('runtime')
+        details['certificates'] = tmdb_data.get('certificates')
+        details['tmdb_url'] = tmdb_data.get('url')
+
+        for key in ('genres', 'languages', 'countries'):
+            raw = tmdb_data.get(key)
+            details[key] = [s.strip() for s in raw.split(',')] if raw else []
+        for role in ('director', 'writer', 'producer', 'composer', 'cinematographer', 'cast'):
+            raw = tmdb_data.get(role)
+            details[role] = [s.strip() for s in raw.split(',')] if raw else []
+
+        details['plot'] = tmdb_data.get('plot')
+        details['tagline'] = tmdb_data.get('tagline')
+        details['box_office'] = (tmdb_data.get('box_office', 0)) if tmdb_data.get('box_office') else None
+        raw_dist = tmdb_data.get('distributors')
+        details['distributors'] = [d.strip() for d in raw_dist.split(',')] if raw_dist else []
+        details['imdb_id'] = tmdb_data.get('imdb_id')
+        details['tmdb_id'] = tmdb_data.get('tmdb_id')
+
+        posters = tmdb_data.get('images', {}).get('posters', {})
+        original_language = tmdb_data.get('images', {}).get('original_language')
+        poster_url = tmdb_data.get('poster_url')
+        if not poster_url:
+            for key in ('en', original_language, 'xx'):
+                if key and posters.get(key):
+                    poster_url = posters[key][0]
+                    break
+        details['poster_url'] = poster_url
+
+        backdrops = tmdb_data.get('images', {}).get('backdrops', {})
+        backdrop_url = None
+        for key in ('en', original_language, 'xx', 'no_lang', 'all'):
+            if key and backdrops.get(key):
+                for b_img in backdrops[key]:
+                    if b_img and b_img != poster_url:
+                        backdrop_url = b_img
+                        break
+                if backdrop_url:
+                    break
+                if not backdrop_url and backdrops[key]:
+                    backdrop_url = backdrops[key][0]
+                    break
+
+        details['backdrop_url'] = backdrop_url
+
+        logos = tmdb_data.get('images', {}).get('logos', {})
+        logo_url = None
+        for key in ('en', original_language, 'xx', 'no_lang', 'all'):
+            if key and logos.get(key):
+                logo_url = logos[key][0]
                 break
-            if not backdrop_url and backdrops[key]:
-                backdrop_url = backdrops[key][0]
-                break
+        details['logo_url'] = logo_url
 
-    details['backdrop_url'] = backdrop_url.replace("/original/", "/w1280/") if backdrop_url else None
+        return details
 
-    logos = data.get('images', {}).get('logos', {})
-    logo_url = None
-    for key in ('en', original_language, 'xx', 'no_lang', 'all'):
-        if key and logos.get(key):
-            logo_url = logos[key][0]
-            break
-    details['logo_url'] = logo_url.replace("/original/", "/w500/") if logo_url else None
-
-    return details
+    logger.warning(f"TMDB & OMDB returned no results for '{q}' → switching to IMDb fallback")
+    return await get_movie_details(q)
