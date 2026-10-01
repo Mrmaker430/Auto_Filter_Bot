@@ -1591,7 +1591,14 @@ async def auto_filter(client, msg, spoll=False):
                 text="↭ ɴᴏ ᴍᴏʀᴇ ᴘᴀɢᴇꜱ ᴀᴠᴀɪʟᴀʙʟᴇ ↭", callback_data="pages")])
 
         if settings.get('imdb'):
-            imdb = await get_posterx(search, file=(files[0]).file_name) if TMDB_POSTER else await get_poster(search, file=(files[0]).file_name)
+            try:
+                imdb = await asyncio.wait_for(
+                    get_posterx(search, file=(files[0]).file_name) if TMDB_POSTER else get_poster(search, file=(files[0]).file_name),
+                    timeout=5.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout fetching poster for '{search}'")
+                imdb = None
         else:
             imdb = None
         cur_time = datetime.now(pytz.timezone('Asia/Kolkata')).time()

@@ -2,6 +2,7 @@ import io
 import logging
 import re
 import os
+import time
 import random
 import string
 from info import ULTRA_FAST_MODE, MAX_LIST_ELM, BAD_WORDS, LONG_IMDB_DESCRIPTION, IS_VERIFY, MAX_B_TN, TUTORIAL, TUTORIAL_2, TUTORIAL_3, LOG_CHANNEL, TMDB_ON_SEARCH, COVERX
@@ -249,7 +250,36 @@ def listx_to_str(k):
     
     return ', '.join(result) if result else "N/A"
     
+POSTER_RESULT_CACHE = {}
+POSTER_CACHE_TTL = 3600
+
+def _get_cached_poster(cache_key):
+    if cache_key in POSTER_RESULT_CACHE:
+        data, ts = POSTER_RESULT_CACHE[cache_key]
+        if time.time() - ts < POSTER_CACHE_TTL:
+            return data
+        else:
+            del POSTER_RESULT_CACHE[cache_key]
+    return None
+
+def _set_cached_poster(cache_key, data):
+    if len(POSTER_RESULT_CACHE) >= 500:
+        POSTER_RESULT_CACHE.pop(next(iter(POSTER_RESULT_CACHE)), None)
+    POSTER_RESULT_CACHE[cache_key] = (data, time.time())
+
 async def get_poster(query, bulk=False, id=False, file=None):
+    cache_key = f"get_poster_{str(query).strip().lower()}_bulk={bulk}_id={id}_file={file}"
+    if not bulk:
+        cached = _get_cached_poster(cache_key)
+        if cached is not None:
+            return cached
+
+    res = await _get_poster_uncached(query, bulk=bulk, id=id, file=file)
+    if res and not bulk:
+        _set_cached_poster(cache_key, res)
+    return res
+
+async def _get_poster_uncached(query, bulk=False, id=False, file=None):
     if not id:
         query = (query.strip()).lower()
         title = query
@@ -441,6 +471,18 @@ async def get_posterx(query, bulk=False, id=False, file=None):
     Fetches movie details from TMDB using the get_movie_detailsx helper
     and formats the output to be compatible with the original get_poster function.
     """
+    cache_key = f"get_posterx_{str(query).strip().lower()}_bulk={bulk}_id={id}_file={file}"
+    if not bulk:
+        cached = _get_cached_poster(cache_key)
+        if cached is not None:
+            return cached
+
+    res = await _get_posterx_uncached(query, bulk=bulk, id=id, file=file)
+    if res and not bulk:
+        _set_cached_poster(cache_key, res)
+    return res
+
+async def _get_posterx_uncached(query, bulk=False, id=False, file=None):
     if not id:
         # The get_movie_detailsx function handles searching by query string.
         details = await get_movie_detailsx(query, file=file)
