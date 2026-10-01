@@ -23,6 +23,58 @@ def test_generate_movie_poster_mock():
     assert buf is not None
     assert len(buf.getvalue()) > 0
 
+def test_generate_movie_poster_4k_dimensions():
+    from PIL import Image
+
+    details = {
+        'title': '4K Dimensions Test Movie',
+        'rating': 8.8,
+        'year': 2025,
+        'genres': ['Action', 'Sci-Fi'],
+        'plot': 'Testing that generated image output is exactly 4K 3840x2160 pixels resolution.',
+        'runtime': '140 min',
+    }
+    buf = asyncio.run(generate_movie_poster(details, '@cholochhitro'))
+    assert buf is not None
+    img = Image.open(buf)
+    assert img.size == (3840, 2160)
+
+def test_get_movie_detailsx_omdb_and_tmdb(monkeypatch):
+    from plugins.Dreamxfutures.Imdbposter import get_movie_detailsx
+
+    async def mock_fetch_omdb_data(query, id=False):
+        return {
+            'title': 'Avatar',
+            'year': 2009,
+            'rating': 7.9,
+            'plot': 'A paraplegic Marine dispatched to the moon Pandora...',
+            'poster_url': 'https://m.media-amazon.com/images/M/avatar_omdb_poster.jpg',
+            'imdb_id': 'tt0499549',
+            'genres': ['Action', 'Adventure', 'Fantasy'],
+        }
+
+    async def mock_fetch_tmdb_data(query, api_key=None):
+        return {
+            'title': 'Avatar',
+            'poster_url': 'https://image.tmdb.org/t/p/original/tmdb_poster.jpg',
+            'backdrop_url': 'https://image.tmdb.org/t/p/original/tmdb_backdrop.jpg',
+            'logo_url': 'https://image.tmdb.org/t/p/original/tmdb_logo.png',
+            'images': {
+                'backdrops': {'en': ['https://image.tmdb.org/t/p/original/tmdb_backdrop.jpg']},
+                'logos': {'en': ['https://image.tmdb.org/t/p/original/tmdb_logo.png']}
+            }
+        }
+
+    monkeypatch.setattr('plugins.Dreamxfutures.Imdbposter._fetch_omdb_data', mock_fetch_omdb_data)
+    monkeypatch.setattr('plugins.Dreamxfutures.Imdbposter._fetch_tmdb_data', mock_fetch_tmdb_data)
+
+    res = asyncio.run(get_movie_detailsx('Avatar 2009'))
+    assert res is not None
+    assert res['title'] == 'Avatar'
+    assert res['poster_url'] == 'https://m.media-amazon.com/images/M/avatar_omdb_poster.jpg'
+    assert res['backdrop_url'] == 'https://image.tmdb.org/t/p/original/tmdb_backdrop.jpg'
+    assert res['logo_url'] == 'https://image.tmdb.org/t/p/original/tmdb_logo.png'
+
 def test_extract_ott_list():
     from plugins.Dreamxfutures.poster_generator import _extract_ott_list
 
