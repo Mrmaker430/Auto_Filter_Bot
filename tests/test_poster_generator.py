@@ -39,39 +39,32 @@ def test_generate_movie_poster_4k_dimensions():
     img = Image.open(buf)
     assert img.size == (3840, 2160)
 
-def test_get_movie_detailsx_omdb_and_tmdb(monkeypatch):
+def test_get_movie_detailsx_tmdb(monkeypatch):
     from plugins.Dreamxfutures.Imdbposter import get_movie_detailsx
-
-    async def mock_fetch_omdb_data(query, id=False):
-        return {
-            'title': 'Avatar',
-            'year': 2009,
-            'rating': 7.9,
-            'plot': 'A paraplegic Marine dispatched to the moon Pandora...',
-            'poster_url': 'https://m.media-amazon.com/images/M/avatar_omdb_poster.jpg',
-            'imdb_id': 'tt0499549',
-            'genres': ['Action', 'Adventure', 'Fantasy'],
-        }
 
     async def mock_fetch_tmdb_data(query, api_key=None):
         return {
             'title': 'Avatar',
+            'year': '2009',
+            'rating': 7.9,
+            'votes': 12000,
+            'plot': 'A paraplegic Marine dispatched to the moon Pandora...',
+            'genres': 'Action, Adventure, Fantasy',
             'poster_url': 'https://image.tmdb.org/t/p/original/tmdb_poster.jpg',
-            'backdrop_url': 'https://image.tmdb.org/t/p/original/tmdb_backdrop.jpg',
-            'logo_url': 'https://image.tmdb.org/t/p/original/tmdb_logo.png',
+            'url': 'https://www.themoviedb.org/movie/19995',
             'images': {
                 'backdrops': {'en': ['https://image.tmdb.org/t/p/original/tmdb_backdrop.jpg']},
                 'logos': {'en': ['https://image.tmdb.org/t/p/original/tmdb_logo.png']}
             }
         }
 
-    monkeypatch.setattr('plugins.Dreamxfutures.Imdbposter._fetch_omdb_data', mock_fetch_omdb_data)
     monkeypatch.setattr('plugins.Dreamxfutures.Imdbposter._fetch_tmdb_data', mock_fetch_tmdb_data)
 
     res = asyncio.run(get_movie_detailsx('Avatar 2009'))
     assert res is not None
     assert res['title'] == 'Avatar'
-    assert res['poster_url'] == 'https://m.media-amazon.com/images/M/avatar_omdb_poster.jpg'
+    assert res['year'] == 2009
+    assert res['poster_url'] == 'https://image.tmdb.org/t/p/original/tmdb_poster.jpg'
     assert res['backdrop_url'] == 'https://image.tmdb.org/t/p/original/tmdb_backdrop.jpg'
     assert res['logo_url'] == 'https://image.tmdb.org/t/p/original/tmdb_logo.png'
 
@@ -128,57 +121,6 @@ def test_dreamxbotz_clean_title():
     assert asyncio.run(dreamxbotz_clean_title('Sample.Movie.2024.1080p.mkv')) == 'Sample Movie 2024'
     assert asyncio.run(dreamxbotz_clean_title('Interstellar.2014.2160p.UHD.mkv')) == 'Interstellar 2014'
 
-def test_get_movie_details_omdb(monkeypatch):
-    from plugins.Dreamxfutures.Imdbposter import get_movie_details_omdb
-
-    class MockResponse:
-        def __init__(self, json_data, status=200):
-            self._json_data = json_data
-            self.status = status
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            pass
-
-        async def json(self):
-            return self._json_data
-
-    class MockSession:
-        def get(self, url, params=None):
-            return MockResponse({
-                "Title": "Guardians of the Galaxy: Vol. 2",
-                "Year": "2017",
-                "Rated": "PG-13",
-                "Released": "05 May 2017",
-                "Runtime": "136 min",
-                "Genre": "Action, Adventure, Comedy",
-                "Director": "James Gunn",
-                "Writer": "James Gunn",
-                "Actors": "Chris Pratt, Zoe Saldaña",
-                "Plot": "The Guardians struggle...",
-                "Language": "English",
-                "Country": "United States",
-                "Poster": "https://m.media-amazon.com/images/M/test._V1_SX300.jpg",
-                "imdbRating": "7.6",
-                "imdbVotes": "828,114",
-                "imdbID": "tt3896198",
-                "Type": "movie",
-                "Response": "True"
-            })
-
-    async def mock_get_session():
-        return MockSession()
-
-    monkeypatch.setattr('plugins.Dreamxfutures.Imdbposter.get_session', mock_get_session)
-
-    res = asyncio.run(get_movie_details_omdb('tt3896198'))
-    assert res is not None
-    assert res['title'] == 'Guardians of the Galaxy: Vol. 2'
-    assert res['poster_url'] == 'https://m.media-amazon.com/images/M/test._V1_SX1280.jpg'
-    assert res['rating'] == 7.6
-    assert res['imdb_id'] == 'tt3896198'
 
 def test_extract_title_and_year():
     from plugins.Dreamxfutures.Imdbposter import _extract_title_and_year

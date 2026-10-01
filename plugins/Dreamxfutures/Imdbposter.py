@@ -7,7 +7,7 @@ from io import BytesIO
 from datetime import datetime
 from difflib import SequenceMatcher
 from PIL import Image
-from info import DREAMXBOTZ_IMAGE_FETCH, TMDB_API_KEY, OMDB_API_KEY, MAX_LIST_ELM
+from info import DREAMXBOTZ_IMAGE_FETCH, TMDB_API_KEY, MAX_LIST_ELM
 
 logger = logging.getLogger(__name__)
 
@@ -452,194 +452,23 @@ async def get_movie_details(query, bulk=False, id=False, file=None):
     }
 
 
-async def _fetch_omdb_data(query: str, id: bool = False, api_key: str = None):
-    """
-    Fetch movie/series details directly from OMDB API.
-    """
-    key = api_key or OMDB_API_KEY or '52a3fdbd'
-    q = str(query).strip()
-    session = await get_session()
-
-    data = None
-    if id or q.startswith("tt"):
-        imdb_id = q if q.startswith("tt") else f"tt{q}"
-        url = f"http://www.omdbapi.com/?i={imdb_id}&apikey={key}"
-        try:
-            async with session.get(url) as resp:
-                if resp.status == 200:
-                    res = await resp.json()
-                    if res.get("Response") == "True":
-                        data = res
-        except Exception as e:
-            logger.error(f"Error fetching OMDB by ID '{imdb_id}': {e}")
-
-    if not data:
-        title, year = _extract_title_and_year(q)
-        params = {'t': title, 'apikey': key}
-        if year:
-            params['y'] = str(year)
-
-        try:
-            async with session.get("http://www.omdbapi.com/", params=params) as resp:
-                if resp.status == 200:
-                    res = await resp.json()
-                    if res.get("Response") == "True":
-                        data = res
-        except Exception as e:
-            logger.error(f"Error fetching OMDB by title '{title}': {e}")
-
-        if not data and year:
-            try:
-                async with session.get("http://www.omdbapi.com/", params={'t': title, 'apikey': key}) as resp:
-                    if resp.status == 200:
-                        res = await resp.json()
-                        if res.get("Response") == "True":
-                            data = res
-            except Exception:
-                pass
-
-        if not data:
-            try:
-                async with session.get("http://www.omdbapi.com/", params={'s': title, 'apikey': key}) as resp:
-                    if resp.status == 200:
-                        s_res = await resp.json()
-                        search_list = s_res.get("Search", [])
-                        if search_list:
-                            first_id = search_list[0].get("imdbID")
-                            if first_id:
-                                async with session.get(f"http://www.omdbapi.com/?i={first_id}&apikey={key}") as resp2:
-                                    if resp2.status == 200:
-                                        res2 = await resp2.json()
-                                        if res2.get("Response") == "True":
-                                            data = res2
-            except Exception as e:
-                logger.error(f"Error fetching OMDB search for '{title}': {e}")
-
-    if not data or data.get("Response") != "True":
-        return None
-
-    poster_raw = data.get("Poster")
-    poster_url = None
-    if poster_raw and poster_raw != "N/A" and poster_raw.startswith("http"):
-        if "._V1_" in poster_raw:
-            poster_url = poster_raw.split("._V1_")[0] + "._V1_SX1280.jpg"
-        else:
-            poster_url = poster_raw
-
-    rating_val = data.get("imdbRating")
-    try:
-        rating = round(float(rating_val), 1) if rating_val and rating_val != "N/A" else None
-    except Exception:
-        rating = None
-
-    def _split_commas(val):
-        if not val or val == "N/A":
-            return []
-        return [s.strip() for s in val.split(",") if s.strip()]
-
-    return {
-        'title': data.get("Title"),
-        'year': int(data.get("Year")[:4]) if data.get("Year") and data.get("Year")[:4].isdigit() else data.get("Year"),
-        'release_date': data.get("Released") if data.get("Released") != "N/A" else None,
-        'rating': rating,
-        'votes': int(data.get("imdbVotes").replace(",", "")) if data.get("imdbVotes") and data.get("imdbVotes") != "N/A" and data.get("imdbVotes").replace(",", "").isdigit() else 0,
-        'runtime': data.get("Runtime") if data.get("Runtime") != "N/A" else None,
-        'certificates': data.get("Rated") if data.get("Rated") != "N/A" else None,
-        'genres': _split_commas(data.get("Genre")),
-        'languages': _split_commas(data.get("Language")),
-        'countries': _split_commas(data.get("Country")),
-        'director': _split_commas(data.get("Director")),
-        'writer': _split_commas(data.get("Writer")),
-        'cast': _split_commas(data.get("Actors")),
-        'plot': data.get("Plot") if data.get("Plot") != "N/A" else "",
-        'tagline': None,
-        'box_office': data.get("BoxOffice") if data.get("BoxOffice") != "N/A" else None,
-        'distributors': [],
-        'poster_url': poster_url,
-        'backdrop_url': poster_url,
-        'logo_url': None,
-        'imdb_id': data.get("imdbID"),
-        'tmdb_id': None,
-        'kind': 'movie' if data.get("Type") == 'movie' else 'tv series',
-        'url': f"https://www.imdb.com/title/{data.get('imdbID')}" if data.get("imdbID") else None,
-    }
-
-
-async def get_movie_details_omdb(query, id=False, file=None):
-    """
-    Fetches movie/series details directly from OMDB API.
-    """
-    return await _fetch_omdb_data(query, id=id)
-
-
 async def get_movie_detailsx(query, id=False, file=None):
     """
-    Primary movie details fetcher: fetches details and mini poster from OMDB,
-    and fetches landscape backdrop image and logo from TMDB.
-    Falls back to TMDB or IMDb on failure.
+    Primary movie details fetcher: fetches details and media images from TMDB.
+    Falls back to IMDb on failure.
     """
     q = str(query).strip()
-    omdb_data = None
     tmdb_data = None
 
     try:
-        omdb_task = asyncio.create_task(_fetch_omdb_data(q, id=id))
-        tmdb_task = asyncio.create_task(_fetch_tmdb_data(q, api_key=TMDB_API_KEY or None))
-        omdb_res, tmdb_res = await asyncio.gather(omdb_task, tmdb_task, return_exceptions=True)
-        if not isinstance(omdb_res, Exception):
-            omdb_data = omdb_res
-        else:
-            logger.error(f"OMDB call error: {omdb_res}")
-
-        if not isinstance(tmdb_res, Exception):
-            tmdb_data = tmdb_res
-        else:
-            logger.error(f"TMDB call error: {tmdb_res}")
+        tmdb_data = await _fetch_tmdb_data(q, api_key=TMDB_API_KEY or None)
     except Exception as e:
-        logger.error(f"Error fetching movie details in get_movie_detailsx: {e}")
+        logger.error(f"TMDB call error in get_movie_detailsx: {e}")
 
-    # If OMDB returned details, enrich with TMDB backdrop and logo
-    if omdb_data and isinstance(omdb_data, dict):
-        if tmdb_data and isinstance(tmdb_data, dict):
-            backdrops = tmdb_data.get('images', {}).get('backdrops', {})
-            logos = tmdb_data.get('images', {}).get('logos', {})
-            original_language = tmdb_data.get('images', {}).get('original_language')
-
-            backdrop_url = tmdb_data.get('backdrop_url')
-            if not backdrop_url:
-                for key in ('en', original_language, 'xx', 'no_lang', 'all'):
-                    if key and backdrops.get(key):
-                        for b_img in backdrops[key]:
-                            if b_img and b_img != omdb_data.get('poster_url'):
-                                backdrop_url = b_img
-                                break
-                        if backdrop_url:
-                            break
-                        if not backdrop_url and backdrops[key]:
-                            backdrop_url = backdrops[key][0]
-                            break
-
-            logo_url = tmdb_data.get('logo_url')
-            if not logo_url:
-                for key in ('en', original_language, 'xx', 'no_lang', 'all'):
-                    if key and logos.get(key):
-                        logo_url = logos[key][0]
-                        break
-
-            if backdrop_url:
-                omdb_data['backdrop_url'] = backdrop_url
-            if logo_url:
-                omdb_data['logo_url'] = logo_url
-            omdb_data['tmdb_id'] = tmdb_data.get('tmdb_id')
-            omdb_data['tmdb_url'] = tmdb_data.get('url')
-
-        return omdb_data
-
-    # If OMDB failed but TMDB succeeded, return TMDB normalized details
     if tmdb_data and isinstance(tmdb_data, dict):
         details = {}
         details['title'] = tmdb_data.get('title') or tmdb_data.get('localized_title')
-        details['year'] = (tmdb_data.get('year', 0)) if tmdb_data.get('year') else None
+        details['year'] = int(tmdb_data.get('year')) if tmdb_data.get('year') and str(tmdb_data.get('year')).isdigit() else tmdb_data.get('year')
         details['release_date'] = tmdb_data.get('release_date')
         details['rating'] = round(float(tmdb_data.get('rating', 0)), 1) if tmdb_data.get('rating') is not None else None
         details['votes'] = int(tmdb_data.get('votes', 0))
@@ -698,5 +527,5 @@ async def get_movie_detailsx(query, id=False, file=None):
 
         return details
 
-    logger.warning(f"TMDB & OMDB returned no results for '{q}' → switching to IMDb fallback")
+    logger.warning(f"TMDB returned no results for '{q}' → switching to IMDb fallback")
     return await get_movie_details(q)
