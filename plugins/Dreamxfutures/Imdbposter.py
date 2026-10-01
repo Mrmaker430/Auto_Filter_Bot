@@ -18,83 +18,13 @@ warnings.simplefilter("ignore", Image.DecompressionBombWarning)
 
 #TMDB API ADDED BY @Bharath_boy
 
-import os
-
 # --- TMDB Configuration ---
-TMDB_BEARER_TOKEN = os.environ.get('TMDB_BEARER_TOKEN', '')
+TMDB_BEARER_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI2ZGU3YTIyZGU1YjE5YTFjNmUyZGU5ZWEyMzE2ZmQxMCIsIm5iZiI6MTc0NTMyMjQ2Mi41MzMsInN1YiI6IjY4MDc4MWRlYzVjODAzNWZiMDhhNjExNCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.rMMJ2-PBIv8Y7ybxPIEpIlzTEXzuwrm9ruKxAUCAsbw'
 TMDB_BASE_URL = 'https://api.themoviedb.org/3'
 TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original'
 MIN_RUNTIME = 40
 
 _session: aiohttp.ClientSession | None = None
-_bangla_ocr_instance = None
-_indic_ocr_instance = None
-
-
-def get_bangla_ocr():
-    global _bangla_ocr_instance
-    if _bangla_ocr_instance is None:
-        try:
-            from bangla_ocr import BanglaOCR
-            _bangla_ocr_instance = BanglaOCR()
-        except Exception as e:
-            logger.warning(f"Could not initialize bangla-ocr: {e}")
-            _bangla_ocr_instance = False
-    return _bangla_ocr_instance if _bangla_ocr_instance is not False else None
-
-
-def get_indic_ocr():
-    global _indic_ocr_instance
-    if _indic_ocr_instance is None:
-        try:
-            import IndicPhotoOCR.ocr as indic_ocr
-            _indic_ocr_instance = indic_ocr
-        except Exception as e:
-            logger.warning(f"Could not initialize IndicPhotoOCR: {e}")
-            _indic_ocr_instance = False
-    return _indic_ocr_instance if _indic_ocr_instance is not False else None
-
-
-def extract_text_from_poster(image_input) -> str:
-    """
-    OCR-first pipeline:
-    1. Extract text from poster using bangla-ocr
-    2. Fallback to IndicPhotoOCR for mixed script
-    Returns clean extracted text or empty string.
-    """
-    if not image_input:
-        return ""
-
-    text = ""
-    # 1. Try bangla-ocr first
-    ocr = get_bangla_ocr()
-    if ocr:
-        try:
-            res = ocr.predict(image_input)
-            if res and isinstance(res, str):
-                text = res.strip()
-        except Exception as e:
-            logger.debug(f"bangla-ocr prediction error: {e}")
-
-    # 2. Fallback to IndicPhotoOCR for mixed script if bangla-ocr returned no text
-    if not text:
-        indic = get_indic_ocr()
-        if indic:
-            try:
-                if hasattr(indic, 'predict'):
-                    res = indic.predict(image_input)
-                elif hasattr(indic, 'recognize'):
-                    res = indic.recognize(image_input)
-                elif hasattr(indic, 'ocr'):
-                    res = indic.ocr(image_input)
-                else:
-                    res = None
-                if res and isinstance(res, str):
-                    text = res.strip()
-            except Exception as e:
-                logger.debug(f"IndicPhotoOCR prediction error: {e}")
-
-    return text
 
 
 # --- Query cleaning helpers ---
@@ -143,10 +73,8 @@ def _clean_query(query: str):
 async def get_session():
     global _session
     if _session is None or _session.closed:
-        connector = aiohttp.TCPConnector(limit=100, ttl_dns_cache=300, ssl=False)
         _session = aiohttp.ClientSession(
-            connector=connector,
-            timeout=aiohttp.ClientTimeout(total=8, connect=3)
+            timeout=aiohttp.ClientTimeout(total=15)
         )
     return _session
 
@@ -235,46 +163,9 @@ async def _tmdb_get(path, params=None, api_key=None):
         return await resp.json()
 
 
-def is_bangladeshi_media(data: dict) -> bool:
-    """Check if the TMDB or IMDb item represents a Bangladeshi movie/show."""
-    if not isinstance(data, dict):
-        return False
-
-    # Check origin_country
-    origin = data.get('origin_country') or []
-    if isinstance(origin, list) and any(str(c).upper() == 'BD' for c in origin if c):
-        return True
-
-    # Check production_countries in TMDB
-    prod_countries = data.get('production_countries') or []
-    if isinstance(prod_countries, list):
-        for pc in prod_countries:
-            if isinstance(pc, dict) and pc.get('iso_3166_1', '').upper() == 'BD':
-                return True
-            elif isinstance(pc, str) and pc.upper() in ('BD', 'BANGLADESH'):
-                return True
-
-    # Check countries string or list
-    countries = data.get('countries') or []
-    if isinstance(countries, str):
-        c_list = [c.strip().upper() for c in countries.split(',')]
-    elif isinstance(countries, list):
-        c_list = [str(c).strip().upper() for c in countries]
-    else:
-        c_list = []
-
-    if any(c in ('BD', 'BANGLADESH') for c in c_list):
-        return True
-
-    return False
-
-
 async def _fetch_media_details(media_type: str, media_id: int, api_key=None):
-    """Fetch full details for a movie or TV show from TMDB with image language parameters."""
-    params = {
-        'append_to_response': 'credits,external_ids,alternative_titles,release_dates,images',
-        'include_image_language': 'bn,null,en'
-    }
+    """Fetch full details for a movie or TV show from TMDB."""
+    params = {'append_to_response': 'credits,external_ids,alternative_titles,release_dates,images'}
     return await _tmdb_get(f"{media_type}/{media_id}", params=params, api_key=api_key)
 
 
@@ -349,18 +240,12 @@ async def _search_media_id(query: str, api_key=None):
         if mtype == 'movie':
             try:
                 details = await _fetch_media_details(mtype, r['id'], api_key=api_key)
-                if is_bangladeshi_media(details) or is_bangladeshi_media(r):
-                    logger.info(f"Skipping Bangladeshi movie: {r.get('title') or r.get('name')}")
-                    continue
                 runtime  = details.get('runtime')
                 is_video = details.get('video', False)
                 if is_video or (runtime and runtime < MIN_RUNTIME):
                     continue
             except Exception:
                 continue
-        elif is_bangladeshi_media(r):
-            logger.info(f"Skipping Bangladeshi media: {r.get('title') or r.get('name')}")
-            continue
 
         candidate = {
             'type':  mtype,
@@ -381,29 +266,17 @@ async def _search_media_id(query: str, api_key=None):
 
 
 def _process_images(images_data):
-    """Organize poster, backdrop, and logo images by language (mapping null to 'null' and 'no_lang')."""
+    """Organize poster, backdrop, and logo images by language."""
     posters_by_lang, backdrops_by_lang, logos_by_lang = {}, {}, {}
     for img in images_data.get('posters', []):
-        url = f"{TMDB_IMAGE_BASE_URL}{img['file_path']}"
-        lang = img.get('iso_639_1') or 'null'
-        posters_by_lang.setdefault(lang, []).append(url)
-        if lang == 'null':
-            posters_by_lang.setdefault('no_lang', []).append(url)
-
+        lang = img.get('iso_639_1') or 'no_lang'
+        posters_by_lang.setdefault(lang, []).append(f"{TMDB_IMAGE_BASE_URL}{img['file_path']}")
     for img in images_data.get('backdrops', []):
-        url = f"{TMDB_IMAGE_BASE_URL}{img['file_path']}"
-        lang = img.get('iso_639_1') or 'null'
-        backdrops_by_lang.setdefault(lang, []).append(url)
-        if lang == 'null':
-            backdrops_by_lang.setdefault('no_lang', []).append(url)
-
+        lang = img.get('iso_639_1') or 'no_lang'
+        backdrops_by_lang.setdefault(lang, []).append(f"{TMDB_IMAGE_BASE_URL}{img['file_path']}")
     for img in images_data.get('logos', []):
-        url = f"{TMDB_IMAGE_BASE_URL}{img['file_path']}"
-        lang = img.get('iso_639_1') or 'null'
-        logos_by_lang.setdefault(lang, []).append(url)
-        if lang == 'null':
-            logos_by_lang.setdefault('no_lang', []).append(url)
-
+        lang = img.get('iso_639_1') or 'no_lang'
+        logos_by_lang.setdefault(lang, []).append(f"{TMDB_IMAGE_BASE_URL}{img['file_path']}")
     posters_by_lang['all'] = [f"{TMDB_IMAGE_BASE_URL}{i['file_path']}" for i in images_data.get('posters', [])]
     backdrops_by_lang['all'] = [f"{TMDB_IMAGE_BASE_URL}{i['file_path']}" for i in images_data.get('backdrops', [])]
     logos_by_lang['all'] = [f"{TMDB_IMAGE_BASE_URL}{i['file_path']}" for i in images_data.get('logos', [])]
@@ -529,10 +402,6 @@ async def get_movie_details(query, bulk=False, id=False, file=None):
     if not movie:
         return None
 
-    if is_bangladeshi_media({'countries': getattr(movie, 'countries', None)}):
-        logger.info(f"Skipping Bangladeshi movie from IMDb: {getattr(movie, 'title', '')}")
-        return None
-
     if movie.release_date:
         date = movie.release_date
     elif movie.year:
@@ -583,31 +452,12 @@ async def get_movie_details(query, bulk=False, id=False, file=None):
     }
 
 
-async def get_movie_detailsx(query, id=False, file=None, image_input=None):
+async def get_movie_detailsx(query, id=False, file=None):
     """
     Primary movie details fetcher: fetches details and media images from TMDB.
-    Runs OCR-first pipeline if image_input or image URL/path query is provided.
     Falls back to IMDb on failure.
     """
     q = str(query).strip()
-
-    # OCR-first pipeline check if image input is provided or query is an image path/URL
-    ocr_target = image_input
-    if not ocr_target and (q.startswith("http://") or q.startswith("https://") or os.path.isfile(q)):
-        ocr_target = q
-
-    if ocr_target:
-        try:
-            ocr_text = await asyncio.to_thread(extract_text_from_poster, ocr_target)
-            if ocr_text:
-                logger.info(f"OCR extracted text from poster: '{ocr_text}'")
-                if q and not (q.startswith("http://") or q.startswith("https://") or os.path.isfile(q)):
-                    q = f"{ocr_text} {q}".strip()
-                else:
-                    q = ocr_text
-        except Exception as e:
-            logger.warning(f"Error during OCR extraction in get_movie_detailsx: {e}")
-
     tmdb_data = None
 
     try:
@@ -643,26 +493,17 @@ async def get_movie_detailsx(query, id=False, file=None, image_input=None):
 
         posters = tmdb_data.get('images', {}).get('posters', {})
         original_language = tmdb_data.get('images', {}).get('original_language')
-
-        # Priority order: Bengali ('bn'), then textless ('null'/'no_lang'), then English ('en')
-        lang_priority = ['bn', 'null', 'no_lang', 'en']
-        if original_language and original_language not in lang_priority:
-            lang_priority.append(original_language)
-
-        poster_url = None
-        for key in lang_priority:
-            if key and posters.get(key):
-                poster_url = posters[key][0]
-                break
-        if not poster_url and tmdb_data.get('poster_url'):
-            poster_url = tmdb_data.get('poster_url')
-        if not poster_url and posters.get('all'):
-            poster_url = posters['all'][0]
+        poster_url = tmdb_data.get('poster_url')
+        if not poster_url:
+            for key in ('en', original_language, 'xx'):
+                if key and posters.get(key):
+                    poster_url = posters[key][0]
+                    break
         details['poster_url'] = poster_url
 
         backdrops = tmdb_data.get('images', {}).get('backdrops', {})
         backdrop_url = None
-        for key in lang_priority + ['all']:
+        for key in ('en', original_language, 'xx', 'no_lang', 'all'):
             if key and backdrops.get(key):
                 for b_img in backdrops[key]:
                     if b_img and b_img != poster_url:
@@ -670,12 +511,15 @@ async def get_movie_detailsx(query, id=False, file=None, image_input=None):
                         break
                 if backdrop_url:
                     break
+                if not backdrop_url and backdrops[key]:
+                    backdrop_url = backdrops[key][0]
+                    break
 
         details['backdrop_url'] = backdrop_url
 
         logos = tmdb_data.get('images', {}).get('logos', {})
         logo_url = None
-        for key in lang_priority + ['all']:
+        for key in ('en', original_language, 'xx', 'no_lang', 'all'):
             if key and logos.get(key):
                 logo_url = logos[key][0]
                 break

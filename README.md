@@ -70,7 +70,7 @@ DreamxBotz is a Telegram auto-filter bot for indexing files from channels/groups
 | Fast download links | Multiple DB support | Custom captions |
 | Telegraph media info | User/chat database | IMDb templates |
 | TMDB movie metadata | Referral and premium data | Shortener settings |
-| OCR-first poster pipeline | Search analytics | Tutorial links |
+| Auto-delete tools | Search analytics | Tutorial links |
 
 ## Requirements
 
@@ -239,13 +239,6 @@ python bot.py
   <img src="https://img.shields.io/badge/User%20Commands-Available-2ea44f?style=flat-square" alt="User Commands">
   <img src="https://img.shields.io/badge/Admin%20Commands-Available-d73a49?style=flat-square" alt="Admin Commands">
 </p>
-
-## OCR & Bengali (Tollywood) Support
-
-- **OCR-First Pipeline:** Automatically extracts title text from poster images using `bangla-ocr` (primary) with fallback to `IndicPhotoOCR` for mixed script text.
-- **TMDB Image Fetching:** Uses `include_image_language=bn,null,en` with preference ordering (Bengali -> Textless -> English).
-- **Bangladeshi Data Filtering:** Strictly filters out Bangladeshi movie data to ensure searches target Indian Bengali (Tollywood) and other non-Bangladeshi titles.
-- **Fast Post Generation:** Uses persistent connection pooling and concurrent image processing for fast update post generation.
 
 ### User Commands
 

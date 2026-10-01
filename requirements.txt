@@ -12,10 +12,6 @@ aiohttp
 telegraph
 pymediainfo-pyrofork
 
-# OCR and Image Processing
-bangla-ocr
-indicphotoocr
-
 # Other tools
 yt-dlp
 Pillow
@@ -24,7 +20,6 @@ aiofiles
 dnspython==2.7.0
 jinja2
 rapidfuzz
-pytest-asyncio
 
 # Git-based Packages
 git+https://github.com/DreamXBotz/IMDBKit.git@main
