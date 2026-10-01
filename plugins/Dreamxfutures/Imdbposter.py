@@ -1,4 +1,5 @@
 import re
+import time
 import asyncio
 import aiohttp
 import warnings
@@ -26,6 +27,28 @@ MIN_RUNTIME = 40
 
 _session: aiohttp.ClientSession | None = None
 
+
+# --- In-Memory Caching and Timeouts ---
+TMDB_DETAILS_CACHE = {}
+IMDB_DETAILS_CACHE = {}
+CACHE_MAX_SIZE = 500
+CACHE_TTL = 3600  # 1 hour
+
+def _get_from_cache(cache_dict, key):
+    if key in cache_dict:
+        data, timestamp = cache_dict[key]
+        if time.time() - timestamp < CACHE_TTL:
+            return data
+        else:
+            del cache_dict[key]
+    return None
+
+def _set_in_cache(cache_dict, key, data):
+    if len(cache_dict) >= CACHE_MAX_SIZE:
+        # Remove oldest entry
+        oldest_key = next(iter(cache_dict))
+        cache_dict.pop(oldest_key, None)
+    cache_dict[key] = (data, time.time())
 
 # --- Query cleaning helpers ---
 _MATH_ALNUM = re.compile(r'[\U0001D400-\U0001D7FF]+')                 # fancy unicode like 𝑺𝒂𝒕𝒚𝒂𝒋𝒊𝒕
@@ -355,6 +378,18 @@ async def _fetch_tmdb_data(query: str, api_key=None):
 
 
 async def get_movie_details(query, bulk=False, id=False, file=None):
+    cache_key = f"{str(query).strip().lower()}_bulk={bulk}_id={id}_file={file}"
+    if not bulk:
+        cached = _get_from_cache(IMDB_DETAILS_CACHE, cache_key)
+        if cached is not None:
+            return cached
+
+    result = await _get_movie_details_uncached(query, bulk=bulk, id=id, file=file)
+    if result and not bulk:
+        _set_in_cache(IMDB_DETAILS_CACHE, cache_key, result)
+    return result
+
+async def _get_movie_details_uncached(query, bulk=False, id=False, file=None):
     if not id:
         from utils import listx_to_str, imdb
         query = (query.strip()).lower()
@@ -455,13 +490,20 @@ async def get_movie_details(query, bulk=False, id=False, file=None):
 async def get_movie_detailsx(query, id=False, file=None):
     """
     Primary movie details fetcher: fetches details and media images from TMDB.
-    Falls back to IMDb on failure.
+    Falls back to IMDb on failure. Uses caching and timeout protection.
     """
     q = str(query).strip()
+    cache_key = f"{q.lower()}_id={id}_file={file}"
+    cached = _get_from_cache(TMDB_DETAILS_CACHE, cache_key)
+    if cached is not None:
+        return cached
+
     tmdb_data = None
 
     try:
-        tmdb_data = await _fetch_tmdb_data(q, api_key=TMDB_API_KEY or None)
+        tmdb_data = await asyncio.wait_for(_fetch_tmdb_data(q, api_key=TMDB_API_KEY or None), timeout=8.0)
+    except asyncio.TimeoutError:
+        logger.warning(f"TMDB request timed out for query '{q}'")
     except Exception as e:
         logger.error(f"TMDB call error in get_movie_detailsx: {e}")
 
@@ -525,7 +567,11 @@ async def get_movie_detailsx(query, id=False, file=None):
                 break
         details['logo_url'] = logo_url
 
+        _set_in_cache(TMDB_DETAILS_CACHE, cache_key, details)
         return details
 
     logger.warning(f"TMDB returned no results for '{q}' → switching to IMDb fallback")
-    return await get_movie_details(q)
+    fallback_res = await get_movie_details(q)
+    if fallback_res:
+        _set_in_cache(TMDB_DETAILS_CACHE, cache_key, fallback_res)
+    return fallback_res

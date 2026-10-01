@@ -280,7 +280,7 @@ async def media_handler(bot, message):
 
     try:
         if await db.movie_update_status(bot.me.id):
-            await process_and_send_update(bot, file_name, media.caption, primary_thumb=primary_thumb)
+            asyncio.create_task(process_and_send_update(bot, file_name, media.caption, primary_thumb=primary_thumb))
     except Exception:
         logger.exception("Error processing media")
 

@@ -119,14 +119,22 @@ async def save_file(media):
     if file_unique_id:
         duplicate_filter["$or"].append({"file_unique_id": file_unique_id})
     try:
-        exists = await Media.find_one(duplicate_filter)
-        if exists:
-            logger.info(f"[SKIP] '{file_name}' already in Primary DB.")
-            return False, 0
         if MULTIPLE_DB:
-            exists = await Media2.find_one(duplicate_filter)
-            if exists:
+            p_exist, s_exist = await asyncio.gather(
+                Media.find_one(duplicate_filter),
+                Media2.find_one(duplicate_filter),
+                return_exceptions=True
+            )
+            if p_exist and not isinstance(p_exist, Exception):
+                logger.info(f"[SKIP] '{file_name}' already in Primary DB.")
+                return False, 0
+            if s_exist and not isinstance(s_exist, Exception):
                 logger.info(f"[SKIP] '{file_name}' already in Secondary DB.")
+                return False, 0
+        else:
+            exists = await Media.find_one(duplicate_filter)
+            if exists:
+                logger.info(f"[SKIP] '{file_name}' already in Primary DB.")
                 return False, 0
     except Exception as e:
         logger.error("Error during duplicate check; continuing with save.", exc_info=e)
