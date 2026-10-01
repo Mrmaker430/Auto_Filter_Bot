@@ -21,11 +21,7 @@ _session: aiohttp.ClientSession | None = None
 async def _get_session():
     global _session
     if _session is None or _session.closed:
-        connector = aiohttp.TCPConnector(limit=100, ttl_dns_cache=300, ssl=False)
-        _session = aiohttp.ClientSession(
-            connector=connector,
-            timeout=aiohttp.ClientTimeout(total=8, connect=3)
-        )
+        _session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15))
     return _session
 
 async def _download_image(source) -> Image.Image | None:
@@ -44,14 +40,14 @@ async def _download_image(source) -> Image.Image | None:
                 return Image.open(source).convert("RGBA")
             if source.startswith("http://") or source.startswith("https://"):
                 session = await _get_session()
-                async with session.get(source, timeout=6.0) as resp:
+                async with session.get(source) as resp:
                     if resp.status == 200:
                         data = await resp.read()
                         return Image.open(BytesIO(data)).convert("RGBA")
                 return None
             try:
                 from dreamxbotz.Bot import dreamxbotz
-                dl = await asyncio.wait_for(dreamxbotz.download_media(source, in_memory=True), timeout=4.0)
+                dl = await asyncio.wait_for(dreamxbotz.download_media(source, in_memory=True), timeout=5.0)
                 if dl and isinstance(dl, BytesIO):
                     dl.seek(0)
                     return Image.open(dl).convert("RGBA")

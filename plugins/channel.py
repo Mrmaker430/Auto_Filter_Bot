@@ -123,7 +123,7 @@ def extract_season_episode(filename: str) -> Tuple[Optional[int], Optional[str]]
             return season, ep
     return None, None
 
-def schedule_update(bot, base_name, delay=2):
+def schedule_update(bot, base_name, delay=5):
     if handle := pending_updates.get(base_name):
         if not handle.cancelled():
             handle.cancel()
@@ -318,7 +318,7 @@ async def _process_with_lock(bot, filename, caption, media_info, base_name, proc
 
     if not movie_doc:
         if TMDB_POSTER:
-            details = await get_movie_detailsx(base_name, image_input=primary_thumb)
+            details = await get_movie_detailsx(base_name)
             if not details or details.get("error") or (not details.get("poster_url") and not details.get("backdrop_url")):
                 error_tmdb=True
                 logger.info("TMDB error switching to IMDB")
