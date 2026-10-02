@@ -352,6 +352,23 @@ async def next_page(bot, query):
     await query.answer()
 
 
+@Client.on_callback_query(filters.regex(r"^cat_filter#"))
+async def category_filter_cb_handler(client: Client, query: CallbackQuery):
+    _, category, key, req = query.data.split("#")
+    try:
+        if int(req) not in [query.from_user.id, 0]:
+            return await query.answer(script.ALRT_TXT.format(query.from_user.first_name), show_alert=True)
+    except Exception:
+        pass
+
+    search = FRESH.get(key)
+    if not search:
+        return await query.answer(script.OLD_ALRT_TXT.format(query.from_user.first_name), show_alert=True)
+
+    await query.answer()
+    await auto_filter(client, query, search_query=search, req_user_id=int(req), category=category)
+
+
 @Client.on_callback_query(filters.regex(r"^spol"))
 async def advantage_spoll_choker(bot, query):
     _, id, user = query.data.split('#')
@@ -1431,7 +1448,7 @@ async def cb_handler(client: Client, query: CallbackQuery):
     await query.answer(MSG_ALRT)
 
 
-async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=None):
+async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=None, category=None):
     """
     Core auto_filter logic supporting exact poster matching.
     """
@@ -1452,8 +1469,17 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
             pass
     m = None
     try:
-        if not spoll:
+        cb_query = msg if isinstance(msg, CallbackQuery) else None
+        if cb_query:
+            message = cb_query.message
+        elif not spoll:
             message = msg
+        else:
+            message = msg.message.reply_to_message if hasattr(msg.message, 'reply_to_message') and msg.message.reply_to_message else msg
+
+        req = req_user_id or (cb_query.from_user.id if cb_query else (message.from_user.id if message and message.from_user else 0))
+
+        if not spoll and not cb_query:
             if message.text and message.text.startswith("/"):
                 return
             if message.text and re.findall(r"((^\/|^,|^!|^\.|^[\U0001F600-\U000E007F]).*)", message.text):
@@ -1488,6 +1514,14 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
 
             files, offset, total_results = await get_search_results(message.chat.id, search, offset=0, filter=True)
 
+            if category in ['movie', 'movies', 'series', 'tv', 'show', 'shows']:
+                series_pattern = re.compile(r"\b(s\d{1,2}|season\s*\d+|e\d{1,2}|episode\s*\d+)\b", re.IGNORECASE)
+                if category in ['movie', 'movies']:
+                    files = [f for f in files if not series_pattern.search(f.file_name)]
+                else:
+                    files = [f for f in files if series_pattern.search(f.file_name)]
+                total_results = len(files)
+
             settings = await get_settings(message.chat.id)
             if not files:
                 if settings.get("spell_check"):
@@ -1509,8 +1543,22 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
                         pass
                     result = await advantage_spell_chok(client, message)
                     return result
+        elif cb_query:
+            search = search_query or FRESH.get(f"{message.chat.id}-{message.id}")
+            if not search:
+                return
+            files, offset, total_results = await get_search_results(message.chat.id, search, offset=0, filter=True)
+
+            if category in ['movie', 'movies', 'series', 'tv', 'show', 'shows']:
+                series_pattern = re.compile(r"\b(s\d{1,2}|season\s*\d+|e\d{1,2}|episode\s*\d+)\b", re.IGNORECASE)
+                if category in ['movie', 'movies']:
+                    files = [f for f in files if not series_pattern.search(f.file_name)]
+                else:
+                    files = [f for f in files if series_pattern.search(f.file_name)]
+                total_results = len(files)
+
+            settings = await get_settings(message.chat.id)
         else:
-            message = msg.message.reply_to_message if hasattr(msg.message, 'reply_to_message') and msg.message.reply_to_message else msg
             search, files, offset, total_results = spoll
             m = await message.reply_text(f'🔎 sᴇᴀʀᴄʜɪɴɢ {search}', reply_to_message_id=message.id)
             settings = await get_settings(message.chat.id)
@@ -1575,6 +1623,39 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
                                "Sᴇɴᴅ Aʟʟ", callback_data=f"sendfiles#{key}", style=enums.ButtonStyle.SUCCESS)
                        ])
 
+        if category in ['movie', 'movies']:
+            cat_buttons = [
+                [InlineKeyboardButton(f"🎬 Movie Options for '{search.title()}'", callback_data="pages", style=enums.ButtonStyle.PRIMARY)],
+                [InlineKeyboardButton("🚫 Close Menu", callback_data="close_data", style=enums.ButtonStyle.DANGER)]
+            ]
+        elif category in ['series', 'tv', 'show', 'shows']:
+            cat_buttons = [
+                [InlineKeyboardButton(f"📺 TV Series Options for '{search.title()}'", callback_data="pages", style=enums.ButtonStyle.SUCCESS)],
+                [InlineKeyboardButton("🚫 Close Menu", callback_data="close_data", style=enums.ButtonStyle.DANGER)]
+            ]
+        else:
+            # Fast query for Movie and TV Series candidate titles and years
+            from plugins.Dreamxfutures.Imdbposter import get_category_candidates
+            candidates = await get_category_candidates(search)
+            movie_details = candidates.get('movie') if candidates else None
+            series_details = candidates.get('series') if candidates else None
+
+            m_title = f"🎬 Movie: {movie_details['title']}" if movie_details and movie_details.get('title') else f"🎬 Movie: {search.title()}"
+            if movie_details and movie_details.get('year'):
+                m_title += f" ({movie_details['year']})"
+
+            s_title = f"📺 TV Series: {series_details['title']}" if series_details and series_details.get('title') else f"📺 TV Series: {search.title()}"
+            if series_details and series_details.get('year'):
+                s_title += f" ({series_details['year']})"
+
+            cat_buttons = [
+                [InlineKeyboardButton(m_title, callback_data=f"cat_filter#movie#{key}#{req}", style=enums.ButtonStyle.PRIMARY)],
+                [InlineKeyboardButton(s_title, callback_data=f"cat_filter#series#{key}#{req}", style=enums.ButtonStyle.SUCCESS)],
+                [InlineKeyboardButton("🚫 Close Menu", callback_data="close_data", style=enums.ButtonStyle.DANGER)]
+            ]
+
+        btn = cat_buttons + btn
+
         if offset != "":
             req = message.from_user.id if message.from_user else 0
             if ULTRA_FAST_MODE:
@@ -1604,10 +1685,11 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
             btn.append([InlineKeyboardButton(
                 text="↭ ɴᴏ ᴍᴏʀᴇ ᴘᴀɢᴇꜱ ᴀᴠᴀɪʟᴀʙʟᴇ ↭", callback_data="pages")])
 
-        if settings.get('imdb'):
+        if settings.get('imdb') and files:
+            first_file = files[0].file_name if files and hasattr(files[0], 'file_name') else None
             try:
                 imdb = await asyncio.wait_for(
-                    get_posterx(search, file=(files[0]).file_name) if TMDB_POSTER else get_poster(search, file=(files[0]).file_name),
+                    get_posterx(search, file=first_file, category=category) if TMDB_POSTER else get_poster(search, file=first_file, category=category),
                     timeout=5.0
                 )
             except asyncio.TimeoutError:

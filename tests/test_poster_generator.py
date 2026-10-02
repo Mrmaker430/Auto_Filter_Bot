@@ -23,21 +23,21 @@ def test_generate_movie_poster_mock():
     assert buf is not None
     assert len(buf.getvalue()) > 0
 
-def test_generate_movie_poster_4k_dimensions():
+def test_generate_movie_poster_1080p_dimensions():
     from PIL import Image
 
     details = {
-        'title': '4K Dimensions Test Movie',
+        'title': '1080p Dimensions Test Movie',
         'rating': 8.8,
         'year': 2025,
         'genres': ['Action', 'Sci-Fi'],
-        'plot': 'Testing that generated image output is exactly 4K 3840x2160 pixels resolution.',
+        'plot': 'Testing that generated image output is exactly 1080p 1920x1080 pixels resolution.',
         'runtime': '140 min',
     }
     buf = asyncio.run(generate_movie_poster(details, '@cholochhitro'))
     assert buf is not None
     img = Image.open(buf)
-    assert img.size == (3840, 2160)
+    assert img.size == (1920, 1080)
 
 def test_get_movie_detailsx_tmdb(monkeypatch):
     from plugins.Dreamxfutures.Imdbposter import get_movie_detailsx

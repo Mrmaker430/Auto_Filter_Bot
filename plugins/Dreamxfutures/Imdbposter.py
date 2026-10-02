@@ -519,6 +519,55 @@ async def _get_movie_details_uncached(query, bulk=False, id=False, file=None):
     }
 
 
+async def get_category_candidates(query: str):
+    """
+    Fast lookup for movie and TV series candidate title/year from TMDB.
+    Uses caching to avoid repeated full details API calls.
+    """
+    clean_q, _, _ = _clean_query(query)
+    title, year = _extract_title_and_year(clean_q)
+    if not title:
+        return {'movie': None, 'series': None}
+
+    cache_key = f"cat_cand_{title.lower()}_{year}"
+    cached = _get_from_cache(TMDB_DETAILS_CACHE, cache_key)
+    if cached is not None:
+        return cached
+
+    params_m = {'query': title, 'language': 'en-US', 'page': 1, 'include_adult': 'false'}
+    params_tv = {'query': title, 'language': 'en-US', 'page': 1, 'include_adult': 'false'}
+
+    try:
+        res_m, res_tv = await asyncio.gather(
+            _tmdb_get('search/movie', params=params_m, api_key=TMDB_API_KEY or None),
+            _tmdb_get('search/tv', params=params_tv, api_key=TMDB_API_KEY or None),
+            return_exceptions=True
+        )
+    except Exception as e:
+        logger.error(f"Error fetching category candidates: {e}")
+        res_m = res_tv = None
+
+    m_candidate = None
+    if isinstance(res_m, dict) and res_m.get('results'):
+        top_m = res_m['results'][0]
+        m_title = top_m.get('title')
+        m_date = top_m.get('release_date') or ''
+        m_year = m_date[:4] if len(m_date) >= 4 else None
+        m_candidate = {'title': m_title, 'year': m_year}
+
+    tv_candidate = None
+    if isinstance(res_tv, dict) and res_tv.get('results'):
+        top_tv = res_tv['results'][0]
+        tv_title = top_tv.get('name')
+        tv_date = top_tv.get('first_air_date') or ''
+        tv_year = tv_date[:4] if len(tv_date) >= 4 else None
+        tv_candidate = {'title': tv_title, 'year': tv_year}
+
+    result = {'movie': m_candidate, 'series': tv_candidate}
+    _set_in_cache(TMDB_DETAILS_CACHE, cache_key, result)
+    return result
+
+
 async def get_movie_detailsx(query, id=False, file=None, category=None):
     """
     Primary movie details fetcher: fetches details and media images from TMDB.
