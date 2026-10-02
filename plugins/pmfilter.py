@@ -1577,6 +1577,60 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
             await client.send_reaction(chat_id=message.chat.id, message_id=message.id, emoji="🍿")
         except Exception:
             pass
+
+        if category is None:
+            # Check if category callback
+            from plugins.Dreamxfutures.Imdbposter import get_category_candidates
+            candidates = await get_category_candidates(search)
+            movie_details = candidates.get('movie') if candidates else None
+            series_details = candidates.get('series') if candidates else None
+
+            m_title = f"🎬 Movie: {movie_details['title']}" if movie_details and movie_details.get('title') else f"🎬 Movie: {search.title()}"
+            if movie_details and movie_details.get('year'):
+                m_title += f" ({movie_details['year']})"
+
+            s_title = f"📺 TV Series: {series_details['title']}" if series_details and series_details.get('title') else f"📺 TV Series: {search.title()}"
+            if series_details and series_details.get('year'):
+                s_title += f" ({series_details['year']})"
+
+            cat_buttons = [
+                [InlineKeyboardButton(m_title, callback_data=f"cat_filter#movie#{key}#{req}", style=enums.ButtonStyle.PRIMARY)],
+                [InlineKeyboardButton(s_title, callback_data=f"cat_filter#series#{key}#{req}", style=enums.ButtonStyle.SUCCESS)],
+                [InlineKeyboardButton("🚫 Close Menu", callback_data="close_data", style=enums.ButtonStyle.DANGER)]
+            ]
+
+            cap = (
+                f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search.title()}</code>\n"
+                f"🧱 ᴛᴏᴛᴀʟ ꜰɪʟᴇꜱ : <code>{total_results}</code>\n\n"
+                f"📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention if message and message.from_user else 'User'}\n\n"
+                f"👇 ᴘʟᴇᴀsᴇ sᴇʟᴇᴄᴛ ᴀ ᴄᴀᴛᴇɢᴏʀʏ ʙᴇʟᴏᴡ:</b>"
+            )
+            sent = await message.reply_text(
+                text=cap,
+                reply_markup=InlineKeyboardMarkup(cat_buttons),
+                disable_web_page_preview=True,
+                parse_mode=enums.ParseMode.HTML
+            )
+            if m:
+                try:
+                    await m.delete()
+                except Exception:
+                    pass
+            try:
+                if settings.get('auto_delete'):
+                    asyncio.create_task(_schedule_delete(sent, message, DELETE_TIME))
+            except KeyError:
+                try:
+                    await save_group_settings(message.chat.id, 'auto_delete', True)
+                except Exception:
+                    pass
+                asyncio.create_task(_schedule_delete(sent, message, DELETE_TIME))
+            return
+
+        if cb_query and not files:
+            await cb_query.answer("🚫 ɴᴏ ꜰɪʟᴇꜱ ꜰᴏᴜɴᴅ ɪɴ ᴛʜɪꜱ ᴄᴀᴛᴇɢᴏʀʏ 🚫", show_alert=True)
+            return
+
         if settings.get('button'):
             btn = [
                 [
@@ -1625,36 +1679,16 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
 
         if category in ['movie', 'movies']:
             cat_buttons = [
-                [InlineKeyboardButton(f"🎬 Movie Options for '{search.title()}'", callback_data="pages", style=enums.ButtonStyle.PRIMARY)],
-                [InlineKeyboardButton("🚫 Close Menu", callback_data="close_data", style=enums.ButtonStyle.DANGER)]
+                [InlineKeyboardButton(f"🎬 Movie Options for '{search.title()}'", callback_data="pages", style=enums.ButtonStyle.PRIMARY)]
             ]
         elif category in ['series', 'tv', 'show', 'shows']:
             cat_buttons = [
-                [InlineKeyboardButton(f"📺 TV Series Options for '{search.title()}'", callback_data="pages", style=enums.ButtonStyle.SUCCESS)],
-                [InlineKeyboardButton("🚫 Close Menu", callback_data="close_data", style=enums.ButtonStyle.DANGER)]
+                [InlineKeyboardButton(f"📺 TV Series Options for '{search.title()}'", callback_data="pages", style=enums.ButtonStyle.SUCCESS)]
             ]
         else:
-            # Fast query for Movie and TV Series candidate titles and years
-            from plugins.Dreamxfutures.Imdbposter import get_category_candidates
-            candidates = await get_category_candidates(search)
-            movie_details = candidates.get('movie') if candidates else None
-            series_details = candidates.get('series') if candidates else None
+            cat_buttons = []
 
-            m_title = f"🎬 Movie: {movie_details['title']}" if movie_details and movie_details.get('title') else f"🎬 Movie: {search.title()}"
-            if movie_details and movie_details.get('year'):
-                m_title += f" ({movie_details['year']})"
-
-            s_title = f"📺 TV Series: {series_details['title']}" if series_details and series_details.get('title') else f"📺 TV Series: {search.title()}"
-            if series_details and series_details.get('year'):
-                s_title += f" ({series_details['year']})"
-
-            cat_buttons = [
-                [InlineKeyboardButton(m_title, callback_data=f"cat_filter#movie#{key}#{req}", style=enums.ButtonStyle.PRIMARY)],
-                [InlineKeyboardButton(s_title, callback_data=f"cat_filter#series#{key}#{req}", style=enums.ButtonStyle.SUCCESS)],
-                [InlineKeyboardButton("🚫 Close Menu", callback_data="close_data", style=enums.ButtonStyle.DANGER)]
-            ]
-
-        btn = cat_buttons + btn
+        btn = cat_buttons + btn + [[InlineKeyboardButton("🚫 Close Menu", callback_data="close_data", style=enums.ButtonStyle.DANGER)]]
 
         if offset != "":
             req = message.from_user.id if message.from_user else 0
@@ -1740,26 +1774,28 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
             )
             temp.IMDB_CAP[message.from_user.id] = cap
             if not settings.get('button'):
-                cap += "\n\n<b><u>Your Requested Files Are Here</u></b>\n\n"
+                cap += "\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
                 for idx, file in enumerate(files, start=1):
-                    cap += f"<b>\n{idx}. <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}\n</a></b>"
+                    cap += f"<b>{idx}. <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n</b>"
+                cap += "</blockquote>"
         else:
             temp.IMDB_CAP[message.from_user.id] = None
             if ULTRA_FAST_MODE:
                 if settings.get('button'):
-                    cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title or temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'} \n\n<u>Your Requested Files Are Here</u> \n\n</b>"
+                    cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention if message and message.from_user else 'User'}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title if message and message.chat else temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'}</b>"
                 else:
-                    cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title or temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'} \n\n<u>Your Requested Files Are Here</u> \n\n</b>"
+                    cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention if message and message.from_user else 'User'}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title if message and message.chat else temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'}</b>\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
                     for idx, file in enumerate(files, start=1):
-                        cap += f"<b>\n{idx}. <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}\n</a></b>"
+                        cap += f"<b>{idx}. <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n</b>"
+                    cap += "</blockquote>"
             else:
                 if settings.get('button'):
-                    cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n🧱 ᴛᴏᴛᴀʟ ꜰɪʟᴇꜱ : <code>{total_results}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title or temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'} \n\n<u>Your Requested Files Are Here</u> \n\n</b>"
+                    cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n🧱 ᴛᴏᴛᴀʟ ꜰɪʟᴇꜱ : <code>{total_results}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention if message and message.from_user else 'User'}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title if message and message.chat else temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'}</b>"
                 else:
-                    cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n🧱 ᴛᴏᴛᴀʟ ꜰɪʟᴇꜱ : <code>{total_results}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title or temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'} \n\n<u>Your Requested Files Are Here</u> \n\n</b>"
-
+                    cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n🧱 ᴛᴏᴛᴀʟ ꜰɪʟᴇꜱ : <code>{total_results}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention if message and message.from_user else 'User'}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title if message and message.chat else temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'}</b>\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
                     for idx, file in enumerate(files, start=1):
-                        cap += f"<b>\n{idx}. <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}\n</a></b>"
+                        cap += f"<b>{idx}. <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n</b>"
+                    cap += "</blockquote>"
         sent = None
         try:
             if imdb and imdb.get('poster'):

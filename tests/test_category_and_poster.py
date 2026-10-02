@@ -76,3 +76,39 @@ async def test_search_media_id_category_filtering():
         assert mid_tv == 202
 
 
+@pytest.mark.asyncio
+async def test_get_cap_blockquote_formatting():
+    from utils import get_cap, clean_filename, get_size
+
+    class DummyFile:
+        def __init__(self, file_id, file_name, file_size):
+            self.file_id = file_id
+            self.file_name = file_name
+            self.file_size = file_size
+
+    class DummyUser:
+        mention = "@testuser"
+        id = 12345
+
+    class DummyChat:
+        id = -10012345
+        title = "Test Group"
+
+    class DummyMessage:
+        chat = DummyChat()
+
+    class DummyQuery:
+        from_user = DummyUser()
+        message = DummyMessage()
+
+    files = [
+        DummyFile("fid1", "Avatar.2009.1080p.mkv", 1073741824),
+        DummyFile("fid2", "Avatar.2009.720p.mkv", 536870912)
+    ]
+    settings = {"imdb": False, "button": False}
+
+    cap = await get_cap(settings, "0.50", files, DummyQuery(), 2, "Avatar")
+    assert "<blockquote expandable>" in cap
+    assert "<b><u>Your Requested Files Are Here</u></b>" in cap
+    assert "</blockquote>" in cap
+    assert "[1.00 GB] Avatar.2009.1080p.mkv" in cap
