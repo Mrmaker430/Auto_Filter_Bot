@@ -1201,6 +1201,8 @@ POSTER_CACHE = {}
 MAX_POSTER_CACHE_SIZE = 100
 
 async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = None) -> Union[io.BytesIO, str, None]:
+    if fallback_cover:
+        return fallback_cover
     if not COVERX:
         return fallback_cover
     if not file_name:

@@ -352,23 +352,6 @@ async def next_page(bot, query):
     await query.answer()
 
 
-@Client.on_callback_query(filters.regex(r"^cat_filter#"))
-async def category_filter_cb_handler(client: Client, query: CallbackQuery):
-    _, category, key, req = query.data.split("#")
-    try:
-        if int(req) not in [query.from_user.id, 0]:
-            return await query.answer(script.ALRT_TXT.format(query.from_user.first_name), show_alert=True)
-    except Exception:
-        pass
-
-    search = FRESH.get(key)
-    if not search:
-        return await query.answer(script.OLD_ALRT_TXT.format(query.from_user.first_name), show_alert=True)
-
-    await query.answer()
-    await auto_filter(client, query, search_query=search, req_user_id=int(req), category=category)
-
-
 @Client.on_callback_query(filters.regex(r"^spol"))
 async def advantage_spoll_choker(bot, query):
     _, id, user = query.data.split('#')
@@ -1578,58 +1561,6 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
         except Exception:
             pass
 
-        if category is None:
-            # Check if category callback
-            from plugins.Dreamxfutures.Imdbposter import get_category_candidates
-            candidates = await get_category_candidates(search)
-            movie_details = candidates.get('movie') if candidates else None
-            series_details = candidates.get('series') if candidates else None
-
-            m_title = f"🎬 Movie: {movie_details['title']}" if movie_details and movie_details.get('title') else f"🎬 Movie: {search.title()}"
-            if movie_details and movie_details.get('year'):
-                m_title += f" ({movie_details['year']})"
-
-            s_title = f"📺 TV Series: {series_details['title']}" if series_details and series_details.get('title') else f"📺 TV Series: {search.title()}"
-            if series_details and series_details.get('year'):
-                s_title += f" ({series_details['year']})"
-
-            cat_buttons = [
-                [InlineKeyboardButton(m_title, callback_data=f"cat_filter#movie#{key}#{req}", style=enums.ButtonStyle.PRIMARY)],
-                [InlineKeyboardButton(s_title, callback_data=f"cat_filter#series#{key}#{req}", style=enums.ButtonStyle.SUCCESS)],
-                [InlineKeyboardButton("🚫 Close Menu", callback_data="close_data", style=enums.ButtonStyle.DANGER)]
-            ]
-
-            cap = (
-                f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search.title()}</code>\n"
-                f"🧱 ᴛᴏᴛᴀʟ ꜰɪʟᴇꜱ : <code>{total_results}</code>\n\n"
-                f"📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention if message and message.from_user else 'User'}\n\n"
-                f"👇 ᴘʟᴇᴀsᴇ sᴇʟᴇᴄᴛ ᴀ ᴄᴀᴛᴇɢᴏʀʏ ʙᴇʟᴏᴡ:</b>"
-            )
-            sent = await message.reply_text(
-                text=cap,
-                reply_markup=InlineKeyboardMarkup(cat_buttons),
-                disable_web_page_preview=True,
-                parse_mode=enums.ParseMode.HTML
-            )
-            if m:
-                try:
-                    await m.delete()
-                except Exception:
-                    pass
-            try:
-                if settings.get('auto_delete'):
-                    asyncio.create_task(_schedule_delete(sent, message, DELETE_TIME))
-            except KeyError:
-                try:
-                    await save_group_settings(message.chat.id, 'auto_delete', True)
-                except Exception:
-                    pass
-                asyncio.create_task(_schedule_delete(sent, message, DELETE_TIME))
-            return
-
-        if cb_query and not files:
-            await cb_query.answer("🚫 ɴᴏ ꜰɪʟᴇꜱ ꜰᴏᴜɴᴅ ɪɴ ᴛʜɪꜱ ᴄᴀᴛᴇɢᴏʀʏ 🚫", show_alert=True)
-            return
 
         if settings.get('button'):
             btn = [
@@ -1677,18 +1608,7 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
                                "Sᴇɴᴅ Aʟʟ", callback_data=f"sendfiles#{key}", style=enums.ButtonStyle.SUCCESS)
                        ])
 
-        if category in ['movie', 'movies']:
-            cat_buttons = [
-                [InlineKeyboardButton(f"🎬 Movie Options for '{search.title()}'", callback_data="pages", style=enums.ButtonStyle.PRIMARY)]
-            ]
-        elif category in ['series', 'tv', 'show', 'shows']:
-            cat_buttons = [
-                [InlineKeyboardButton(f"📺 TV Series Options for '{search.title()}'", callback_data="pages", style=enums.ButtonStyle.SUCCESS)]
-            ]
-        else:
-            cat_buttons = []
-
-        btn = cat_buttons + btn + [[InlineKeyboardButton("🚫 Close Menu", callback_data="close_data", style=enums.ButtonStyle.DANGER)]]
+        btn = btn + [[InlineKeyboardButton("🚫 Close Menu", callback_data="close_data", style=enums.ButtonStyle.DANGER)]]
 
         if offset != "":
             req = message.from_user.id if message.from_user else 0
