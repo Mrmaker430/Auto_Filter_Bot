@@ -114,6 +114,25 @@ async def pm_text(bot, message):
         pass
 
 
+@Client.on_callback_query(filters.regex(r"^cat#"))
+async def category_cb_handler(client: Client, query: CallbackQuery):
+    _, cat, req, key = query.data.split("#")
+    if int(req) not in [query.from_user.id, 0]:
+        return await query.answer(script.ALRT_TXT.format(query.from_user.first_name), show_alert=True)
+
+    search = FRESH.get(key)
+    if not search:
+        return await query.answer(script.OLD_ALRT_TXT.format(query.from_user.first_name), show_alert=True)
+
+    try:
+        await query.answer()
+    except Exception:
+        pass
+
+    orig_msg = query.message.reply_to_message if query.message.reply_to_message else query.message
+    await auto_filter(client, orig_msg, category=cat, search_query=search, cat_msg=query.message, req_user_id=int(req))
+
+
 @Client.on_callback_query(filters.regex(r"^reffff"))
 async def refercall(bot, query):
     btn = [[
@@ -1431,9 +1450,9 @@ async def cb_handler(client: Client, query: CallbackQuery):
     await query.answer(MSG_ALRT)
 
 
-async def auto_filter(client, msg, spoll=False):
+async def auto_filter(client, msg, spoll=False, category=None, search_query=None, cat_msg=None, req_user_id=None):
     """
-    Core auto_filter logic with timing/debug logging removed.
+    Core auto_filter logic supporting group chat category choices and exact poster matching.
     """
     curr_time = datetime.now(pytz.timezone('Asia/Kolkata')).time()
 
@@ -1449,20 +1468,23 @@ async def auto_filter(client, msg, spoll=False):
             except Exception:
                 pass
         except Exception:
-            # ignore scheduling errors
             pass
     m = None
     try:
         if not spoll:
             message = msg
-            if message.text.startswith("/"):
+            if message.text and message.text.startswith("/"):
                 return
-            if re.findall(r"((^\/|^,|^!|^\.|^[\U0001F600-\U000E007F]).*)", message.text):
+            if message.text and re.findall(r"((^\/|^,|^!|^\.|^[\U0001F600-\U000E007F]).*)", message.text):
                 return
-            if len(message.text) < 100:
+
+            if search_query:
+                search = search_query
+            else:
+                if not message.text or len(message.text) >= 100:
+                    return
                 message_text = message.text or ""
                 search = message_text.lower()
-                m = await message.reply_text(script.SEARCHING_TXT.format(search))
                 find = search.split(" ")
                 search = ""
                 removes = ["in", "upload", "series", "full",
@@ -1476,41 +1498,86 @@ async def auto_filter(client, msg, spoll=False):
                 search = search.replace("-", " ")
                 search = re.sub(r"[:']", "", search)
                 search = re.sub(r"\s+", " ", search).strip()
-                files, offset, total_results = await get_search_results(message.chat.id, search, offset=0, filter=True)
-                settings = await get_settings(message.chat.id)
-                if not files:
-                    if settings.get("spell_check"):
-                        ai_sts = await m.edit('🤖 ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ, ᴀɪ ɪꜱ ᴄʜᴇᴄᴋɪɴɢ ʏᴏᴜʀ ꜱᴘᴇʟʟɪɴɢ...')
-                        is_misspelled = await ai_spell_check(chat_id=message.chat.id, wrong_name=search)
-                        if is_misspelled:
-                            await ai_sts.edit(f'✅ Aɪ Sᴜɢɢᴇsᴛᴇᴅ: <code>{is_misspelled}</code>\n🔍 Searching for it...')
-                            message.text = is_misspelled
-                            await ai_sts.delete()
-                            return await auto_filter(client, message)
-                        await ai_sts.delete()
-                        result = await advantage_spell_chok(client, message)
-                        return result
-                    else:
-                        try:
-                            if m:
-                                await m.delete()
-                        except Exception:
-                            pass
-                        result = await advantage_spell_chok(client, message)
-                        return result
-            else:
+
+            key = f"{message.chat.id}-{message.id}"
+            FRESH[key] = search
+            req = req_user_id or (message.from_user.id if message.from_user else 0)
+
+            # If search is performed in a group chat and category has not been selected yet, send category buttons first
+            if category is None and message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
+                cat_btns = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🎬 Movie", callback_data=f"cat#movie#{req}#{key}"),
+                        InlineKeyboardButton("📺 TV Series", callback_data=f"cat#series#{req}#{key}")
+                    ]
+                ])
+                await message.reply_text(
+                    f"<b>🔍 Select Category for: <code>{search}</code></b>",
+                    reply_markup=cat_btns,
+                    parse_mode=enums.ParseMode.HTML
+                )
                 return
+
+            m = await message.reply_text(script.SEARCHING_TXT.format(search))
+            if cat_msg:
+                try:
+                    await cat_msg.delete()
+                except Exception:
+                    pass
+
+            files, offset, total_results = await get_search_results(message.chat.id, search, offset=0, filter=True)
+
+            # Category filtering
+            if category:
+                series_pattern = re.compile(r"(?:s\d{1,2}|season\s*\d+|season\d+|e\d{1,2}|episode\s*\d+)", re.IGNORECASE)
+                if category == "movie":
+                    filtered_files = [f for f in files if not series_pattern.search(f.file_name)]
+                    if filtered_files:
+                        files = filtered_files
+                        total_results = len(files)
+                elif category in ["series", "tv"]:
+                    filtered_files = [f for f in files if series_pattern.search(f.file_name)]
+                    if filtered_files:
+                        files = filtered_files
+                        total_results = len(files)
+
+            settings = await get_settings(message.chat.id)
+            if not files:
+                if settings.get("spell_check"):
+                    ai_sts = await m.edit('🤖 ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ, ᴀɪ ɪꜱ ᴄʜᴇᴄᴋɪɴɢ ʏᴏᴜʀ ꜱᴘᴇʟʟɪɴɢ...')
+                    is_misspelled = await ai_spell_check(chat_id=message.chat.id, wrong_name=search)
+                    if is_misspelled:
+                        await ai_sts.edit(f'✅ Aɪ Sᴜɢɢᴇsᴛᴇᴅ: <code>{is_misspelled}</code>\n🔍 Searching for it...')
+                        message.text = is_misspelled
+                        await ai_sts.delete()
+                        return await auto_filter(client, message, category=category)
+                    await ai_sts.delete()
+                    result = await advantage_spell_chok(client, message)
+                    return result
+                else:
+                    try:
+                        if m:
+                            await m.delete()
+                    except Exception:
+                        pass
+                    result = await advantage_spell_chok(client, message)
+                    return result
         else:
-            message = msg.message.reply_to_message
+            message = msg.message.reply_to_message if hasattr(msg.message, 'reply_to_message') and msg.message.reply_to_message else msg
             search, files, offset, total_results = spoll
             m = await message.reply_text(f'🔎 sᴇᴀʀᴄʜɪɴɢ {search}', reply_to_message_id=message.id)
             settings = await get_settings(message.chat.id)
-            await msg.message.delete()
+            if hasattr(msg, 'message'):
+                try:
+                    await msg.message.delete()
+                except Exception:
+                    pass
+
         key = f"{message.chat.id}-{message.id}"
         FRESH[key] = search
         temp.GETALL[key] = files
-        req = message.from_user.id if message.from_user else 0
-        temp.SHORT[message.from_user.id] = message.chat.id
+        req = req_user_id or (message.from_user.id if message.from_user else 0)
+        temp.SHORT[message.from_user.id if message.from_user else req] = message.chat.id
         try:
             await client.send_reaction(chat_id=message.chat.id, message_id=message.id, emoji="🍿")
         except Exception:
@@ -1593,7 +1660,7 @@ async def auto_filter(client, msg, spoll=False):
         if settings.get('imdb'):
             try:
                 imdb = await asyncio.wait_for(
-                    get_posterx(search, file=(files[0]).file_name) if TMDB_POSTER else get_poster(search, file=(files[0]).file_name),
+                    get_posterx(search, file=(files[0]).file_name, category=category) if TMDB_POSTER else get_poster(search, file=(files[0]).file_name, category=category),
                     timeout=5.0
                 )
             except asyncio.TimeoutError:

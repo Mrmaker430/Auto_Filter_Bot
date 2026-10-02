@@ -192,7 +192,7 @@ async def _fetch_media_details(media_type: str, media_id: int, api_key=None):
     return await _tmdb_get(f"{media_type}/{media_id}", params=params, api_key=api_key)
 
 
-async def _search_media_id(query: str, api_key=None):
+async def _search_media_id(query: str, api_key=None, category=None):
     """Search TMDB for the best matching movie/TV show and return (media_type, media_id)."""
     cleaned, season, episode = _clean_query(query)
     title, year = _extract_title_and_year(cleaned)
@@ -207,8 +207,13 @@ async def _search_media_id(query: str, api_key=None):
         queries_to_try.append(" ".join(words[:-1]))
     queries_to_try = list(dict.fromkeys(queries_to_try))
 
-    # If the filename had SxxExx, this is a TV episode → use /search/tv
-    endpoint = 'search/tv' if season is not None else 'search/multi'
+    # Determine endpoint based on category or SxxExx
+    if category in ['movie', 'movies']:
+        endpoint = 'search/movie'
+    elif category in ['series', 'tv', 'show', 'shows'] or season is not None:
+        endpoint = 'search/tv'
+    else:
+        endpoint = 'search/multi'
 
     multi_results = []
     for target_query in queries_to_try:
@@ -220,18 +225,33 @@ async def _search_media_id(query: str, api_key=None):
         if multi_results:
             break
 
-    def get_ratio(s1, s2):
-        if not s1 or not s2:
-            return 0
-        return SequenceMatcher(None, s1.lower(), s2.lower()).ratio()
+    target_words = set(re.findall(r'\w+', title.lower()))
 
-    # Score against the CLEANED title, not the raw filename
+    def get_title_score(res_title):
+        if not res_title or not title:
+            return 0.0
+        res_clean = res_title.lower().strip()
+        title_clean = title.lower().strip()
+        if res_clean == title_clean:
+            return 1.0
+
+        res_words = set(re.findall(r'\w+', res_clean))
+        extra_words = res_words - target_words
+        base_ratio = SequenceMatcher(None, res_clean, title_clean).ratio()
+
+        if res_clean.startswith(title_clean) or title_clean in res_clean:
+            return max(0.5, base_ratio - (0.1 * len(extra_words)))
+
+        # Heavily penalize candidate titles that contain extra words not in search query
+        penalty = 0.25 * len(extra_words)
+        return max(0.0, base_ratio - penalty)
+
     scored_results = []
     for r in multi_results:
         res_title = r.get('title') or r.get('name')
-        ratio = get_ratio(res_title, title)
-        if ratio >= 0.6:
-            scored_results.append((r, ratio))
+        t_score = get_title_score(res_title)
+        if t_score >= 0.45 or (res_title and res_title.lower().strip() == title.lower().strip()):
+            scored_results.append((r, t_score))
 
     if not scored_results:
         return None, None
@@ -241,7 +261,17 @@ async def _search_media_id(query: str, api_key=None):
     for r, ratio in scored_results:
         mtype = r.get('media_type')
         if not mtype:
-            mtype = 'tv' if endpoint == 'search/tv' else None
+            if endpoint == 'search/movie':
+                mtype = 'movie'
+            elif endpoint == 'search/tv':
+                mtype = 'tv'
+            else:
+                mtype = None
+        if category in ['movie', 'movies'] and mtype != 'movie':
+            continue
+        if category in ['series', 'tv', 'show', 'shows'] and mtype != 'tv':
+            continue
+
         rd_str = r.get('release_date') or r.get('first_air_date')
         if not (rd_str and mtype in ['movie', 'tv']):
             continue
@@ -253,12 +283,14 @@ async def _search_media_id(query: str, api_key=None):
         year_bonus = 0.0
         if year:
             year_diff = abs(rd_date.year - year)
-            if year_diff > 2:
-                continue
-            elif year_diff == 0:
-                year_bonus = 0.25
+            if year_diff == 0:
+                year_bonus = 0.20
             elif year_diff == 1:
-                year_bonus = 0.1
+                year_bonus = 0.10
+            elif year_diff == 2:
+                year_bonus = 0.05
+            else:
+                year_bonus = -0.10
 
         if mtype == 'movie':
             try:
@@ -307,12 +339,12 @@ def _process_images(images_data):
     return {'posters': posters_by_lang, 'backdrops': backdrops_by_lang, 'logos': logos_by_lang, 'available_languages': languages}
 
 
-async def _fetch_tmdb_data(query: str, api_key=None):
+async def _fetch_tmdb_data(query: str, api_key=None, category=None):
     """
     Core TMDB lookup: search → fetch details → build response dict.
     This replaces the external tmdb.blazeposters.workers.dev API call.
     """
-    media_type, media_id = await _search_media_id(query, api_key=api_key)
+    media_type, media_id = await _search_media_id(query, api_key=api_key, category=category)
     if not media_id:
         return None
 
@@ -487,13 +519,13 @@ async def _get_movie_details_uncached(query, bulk=False, id=False, file=None):
     }
 
 
-async def get_movie_detailsx(query, id=False, file=None):
+async def get_movie_detailsx(query, id=False, file=None, category=None):
     """
     Primary movie details fetcher: fetches details and media images from TMDB.
     Falls back to IMDb on failure. Uses caching and timeout protection.
     """
     q = str(query).strip()
-    cache_key = f"{q.lower()}_id={id}_file={file}"
+    cache_key = f"{q.lower()}_id={id}_file={file}_cat={category}"
     cached = _get_from_cache(TMDB_DETAILS_CACHE, cache_key)
     if cached is not None:
         return cached
@@ -501,7 +533,10 @@ async def get_movie_detailsx(query, id=False, file=None):
     tmdb_data = None
 
     try:
-        tmdb_data = await asyncio.wait_for(_fetch_tmdb_data(q, api_key=TMDB_API_KEY or None), timeout=8.0)
+        try:
+            tmdb_data = await asyncio.wait_for(_fetch_tmdb_data(q, api_key=TMDB_API_KEY or None, category=category), timeout=8.0)
+        except TypeError:
+            tmdb_data = await asyncio.wait_for(_fetch_tmdb_data(q, api_key=TMDB_API_KEY or None), timeout=8.0)
     except asyncio.TimeoutError:
         logger.warning(f"TMDB request timed out for query '{q}'")
     except Exception as e:
