@@ -267,19 +267,19 @@ def _set_cached_poster(cache_key, data):
         POSTER_RESULT_CACHE.pop(next(iter(POSTER_RESULT_CACHE)), None)
     POSTER_RESULT_CACHE[cache_key] = (data, time.time())
 
-async def get_poster(query, bulk=False, id=False, file=None):
-    cache_key = f"get_poster_{str(query).strip().lower()}_bulk={bulk}_id={id}_file={file}"
+async def get_poster(query, bulk=False, id=False, file=None, category=None):
+    cache_key = f"get_poster_{str(query).strip().lower()}_bulk={bulk}_id={id}_file={file}_cat={category}"
     if not bulk:
         cached = _get_cached_poster(cache_key)
         if cached is not None:
             return cached
 
-    res = await _get_poster_uncached(query, bulk=bulk, id=id, file=file)
+    res = await _get_poster_uncached(query, bulk=bulk, id=id, file=file, category=category)
     if res and not bulk:
         _set_cached_poster(cache_key, res)
     return res
 
-async def _get_poster_uncached(query, bulk=False, id=False, file=None):
+async def _get_poster_uncached(query, bulk=False, id=False, file=None, category=None):
     if not id:
         query = (query.strip()).lower()
         title = query
@@ -299,6 +299,29 @@ async def _get_poster_uncached(query, bulk=False, id=False, file=None):
             return None
         
         movie_list = search_result.titles[:MAX_LIST_ELM]
+
+        target_words = set(re.findall(r'\w+', title.lower()))
+        from difflib import SequenceMatcher
+
+        def get_imdb_score(m):
+            m_title = (getattr(m, 'title', '') or '').lower().strip()
+            if not m_title:
+                return 0.0
+            if m_title == title.lower().strip():
+                t_score = 1.0
+            else:
+                m_words = set(re.findall(r'\w+', m_title))
+                extra = m_words - target_words
+                base_ratio = SequenceMatcher(None, m_title, title.lower().strip()).ratio()
+                t_score = max(0.0, base_ratio - 0.25 * len(extra))
+
+            y_score = 0.0
+            if year_val and getattr(m, 'year', None):
+                if str(m.year) == str(year_val):
+                    y_score = 0.2
+            return t_score + y_score
+
+        movie_list.sort(key=get_imdb_score, reverse=True)
         
         if year_val:
             filtered = [m for m in movie_list if m.year and str(m.year) == str(year_val)]
@@ -307,7 +330,13 @@ async def _get_poster_uncached(query, bulk=False, id=False, file=None):
         else:
             filtered = movie_list
             
-        kind_filter = ['movie', 'tv series', 'tvSeries', 'tvMiniSeries', 'tvMovie']
+        if category in ['movie', 'movies']:
+            kind_filter = ['movie', 'tvMovie']
+        elif category in ['series', 'tv', 'show', 'shows']:
+            kind_filter = ['tv series', 'tvSeries', 'tvMiniSeries']
+        else:
+            kind_filter = ['movie', 'tv series', 'tvSeries', 'tvMiniSeries', 'tvMovie']
+
         filtered_kind = [m for m in filtered if m.kind and m.kind in kind_filter]
         
         if not filtered_kind:
@@ -466,29 +495,29 @@ async def old_get_poster(query, bulk=False, id=False, file=None):
         'url':f'https://www.imdb.com/title/tt{movieid}'
     }
     
-async def get_posterx(query, bulk=False, id=False, file=None):
+async def get_posterx(query, bulk=False, id=False, file=None, category=None):
     """
     Fetches movie details from TMDB using the get_movie_detailsx helper
     and formats the output to be compatible with the original get_poster function.
     """
-    cache_key = f"get_posterx_{str(query).strip().lower()}_bulk={bulk}_id={id}_file={file}"
+    cache_key = f"get_posterx_{str(query).strip().lower()}_bulk={bulk}_id={id}_file={file}_cat={category}"
     if not bulk:
         cached = _get_cached_poster(cache_key)
         if cached is not None:
             return cached
 
-    res = await _get_posterx_uncached(query, bulk=bulk, id=id, file=file)
+    res = await _get_posterx_uncached(query, bulk=bulk, id=id, file=file, category=category)
     if res and not bulk:
         _set_cached_poster(cache_key, res)
     return res
 
-async def _get_posterx_uncached(query, bulk=False, id=False, file=None):
+async def _get_posterx_uncached(query, bulk=False, id=False, file=None, category=None):
     if not id:
         # The get_movie_detailsx function handles searching by query string.
-        details = await get_movie_detailsx(query, file=file)
+        details = await get_movie_detailsx(query, file=file, category=category)
     else:
         # Assumes the 'id' is a TMDB ID or IMDb ID that get_movie_detailsx can handle.
-        details = await get_movie_detailsx(query, id=True)
+        details = await get_movie_detailsx(query, id=True, category=category)
 
     if not details or details.get("error"):
         return None
