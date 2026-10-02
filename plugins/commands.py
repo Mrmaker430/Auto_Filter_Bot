@@ -38,7 +38,7 @@ REQUEST_INVITE_LINK_CACHE: dict[int, str] = {}
 async def start(client, message):
     sticker = None
     try:
-        stick_id = "CAACAgUAAxkBAAEQJmJpViid_0yscWKPfh3RMCY8pIkmXwACMAcAAqzbsFexyKU6FPQAAjgE"
+        stick_id = "CAACAgUAAxkBAAKtdGgY_oVu5O9YEmOu6b6kvpLS6obHAAIHEAAC9ObwVKPML5wam9HQNgQ"
         try:
             sticker = await message.reply_sticker(sticker=stick_id)
         except Exception as e:

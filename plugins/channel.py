@@ -414,7 +414,11 @@ async def send_movie_update(bot, base_name):
                 "primary_thumb": movie_doc.get("primary_thumb"),
                 "ott_platform": ott_str,
             }
-            generated_poster = await generate_movie_poster(poster_details)
+            try:
+                generated_poster = await asyncio.wait_for(generate_movie_poster(poster_details), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout generating poster for movie update '{base_name}'")
+                generated_poster = None
             if generated_poster:
                 msg = await bot.send_photo(
                     chat_id=MOVIE_UPDATE_CHANNEL,

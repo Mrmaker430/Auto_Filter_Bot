@@ -179,14 +179,18 @@ def test_get_or_generate_cover(monkeypatch):
     monkeypatch.setattr('plugins.Dreamxfutures.Imdbposter.get_movie_detailsx', mock_get_movie_detailsx)
     monkeypatch.setattr('plugins.Dreamxfutures.poster_generator.generate_movie_poster', mock_generate_movie_poster)
 
-    # First call generates and caches poster
-    res1 = asyncio.run(get_or_generate_cover('Inception.2010.1080p.mkv', 'fallback_cover_id'))
+    # When fallback_cover is provided, it returns immediately
+    res_fallback = asyncio.run(get_or_generate_cover('Inception.2010.1080p.mkv', 'fallback_cover_id'))
+    assert res_fallback == 'fallback_cover_id'
+
+    # First call without fallback_cover generates and caches poster
+    res1 = asyncio.run(get_or_generate_cover('Inception.2010.1080p.mkv', None))
     assert isinstance(res1, BytesIO)
     assert getattr(res1, 'name', None) == 'cover.jpg'
     assert res1.getvalue() == b"fake_poster_image_bytes"
 
     # Second call returns cached poster
-    res2 = asyncio.run(get_or_generate_cover('Inception.2010.720p.mkv', 'fallback_cover_id'))
+    res2 = asyncio.run(get_or_generate_cover('Inception.2010.720p.mkv', None))
     assert isinstance(res2, BytesIO)
     assert getattr(res2, 'name', None) == 'cover.jpg'
     assert res2.getvalue() == b"fake_poster_image_bytes"
