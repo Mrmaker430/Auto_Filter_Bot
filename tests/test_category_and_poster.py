@@ -76,26 +76,3 @@ async def test_search_media_id_category_filtering():
         assert mid_tv == 202
 
 
-@pytest.mark.asyncio
-async def test_category_file_filtering():
-    class DummyFile:
-        def __init__(self, file_id, file_name, file_size=1000):
-            self.file_id = file_id
-            self.file_name = file_name
-            self.file_size = file_size
-
-    movie_file = DummyFile("1", "Homecoming.2022.1080p.WEBRip.mkv")
-    series_file = DummyFile("2", "All.American.Homecoming.S01E01.1080p.mkv")
-
-    all_files = [movie_file, series_file]
-
-    series_pattern = re.compile(r"(?:s\d{1,2}|season\s*\d+|season\d+|e\d{1,2}|episode\s*\d+)", re.IGNORECASE)
-
-    movie_filtered = [f for f in all_files if not series_pattern.search(f.file_name)]
-    series_filtered = [f for f in all_files if series_pattern.search(f.file_name)]
-
-    assert len(movie_filtered) == 1
-    assert movie_filtered[0].file_id == "1"
-
-    assert len(series_filtered) == 1
-    assert series_filtered[0].file_id == "2"

@@ -114,25 +114,6 @@ async def pm_text(bot, message):
         pass
 
 
-@Client.on_callback_query(filters.regex(r"^cat#"))
-async def category_cb_handler(client: Client, query: CallbackQuery):
-    _, cat, req, key = query.data.split("#")
-    if int(req) not in [query.from_user.id, 0]:
-        return await query.answer(script.ALRT_TXT.format(query.from_user.first_name), show_alert=True)
-
-    search = FRESH.get(key)
-    if not search:
-        return await query.answer(script.OLD_ALRT_TXT.format(query.from_user.first_name), show_alert=True)
-
-    try:
-        await query.answer()
-    except Exception:
-        pass
-
-    orig_msg = query.message.reply_to_message if query.message.reply_to_message else query.message
-    await auto_filter(client, orig_msg, category=cat, search_query=search, cat_msg=query.message, req_user_id=int(req))
-
-
 @Client.on_callback_query(filters.regex(r"^reffff"))
 async def refercall(bot, query):
     btn = [[
@@ -1450,9 +1431,9 @@ async def cb_handler(client: Client, query: CallbackQuery):
     await query.answer(MSG_ALRT)
 
 
-async def auto_filter(client, msg, spoll=False, category=None, search_query=None, cat_msg=None, req_user_id=None):
+async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=None):
     """
-    Core auto_filter logic supporting group chat category choices and exact poster matching.
+    Core auto_filter logic supporting exact poster matching.
     """
     curr_time = datetime.now(pytz.timezone('Asia/Kolkata')).time()
 
@@ -1503,43 +1484,9 @@ async def auto_filter(client, msg, spoll=False, category=None, search_query=None
             FRESH[key] = search
             req = req_user_id or (message.from_user.id if message.from_user else 0)
 
-            # If search is performed in a group chat and category has not been selected yet, send category buttons first
-            if category is None and message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
-                cat_btns = InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("🎬 Movie", callback_data=f"cat#movie#{req}#{key}"),
-                        InlineKeyboardButton("📺 TV Series", callback_data=f"cat#series#{req}#{key}")
-                    ]
-                ])
-                await message.reply_text(
-                    f"<b>🔍 Select Category for: <code>{search}</code></b>",
-                    reply_markup=cat_btns,
-                    parse_mode=enums.ParseMode.HTML
-                )
-                return
-
             m = await message.reply_text(script.SEARCHING_TXT.format(search))
-            if cat_msg:
-                try:
-                    await cat_msg.delete()
-                except Exception:
-                    pass
 
             files, offset, total_results = await get_search_results(message.chat.id, search, offset=0, filter=True)
-
-            # Category filtering
-            if category:
-                series_pattern = re.compile(r"(?:s\d{1,2}|season\s*\d+|season\d+|e\d{1,2}|episode\s*\d+)", re.IGNORECASE)
-                if category == "movie":
-                    filtered_files = [f for f in files if not series_pattern.search(f.file_name)]
-                    if filtered_files:
-                        files = filtered_files
-                        total_results = len(files)
-                elif category in ["series", "tv"]:
-                    filtered_files = [f for f in files if series_pattern.search(f.file_name)]
-                    if filtered_files:
-                        files = filtered_files
-                        total_results = len(files)
 
             settings = await get_settings(message.chat.id)
             if not files:
@@ -1550,7 +1497,7 @@ async def auto_filter(client, msg, spoll=False, category=None, search_query=None
                         await ai_sts.edit(f'✅ Aɪ Sᴜɢɢᴇsᴛᴇᴅ: <code>{is_misspelled}</code>\n🔍 Searching for it...')
                         message.text = is_misspelled
                         await ai_sts.delete()
-                        return await auto_filter(client, message, category=category)
+                        return await auto_filter(client, message)
                     await ai_sts.delete()
                     result = await advantage_spell_chok(client, message)
                     return result
@@ -1660,7 +1607,7 @@ async def auto_filter(client, msg, spoll=False, category=None, search_query=None
         if settings.get('imdb'):
             try:
                 imdb = await asyncio.wait_for(
-                    get_posterx(search, file=(files[0]).file_name, category=category) if TMDB_POSTER else get_poster(search, file=(files[0]).file_name, category=category),
+                    get_posterx(search, file=(files[0]).file_name) if TMDB_POSTER else get_poster(search, file=(files[0]).file_name),
                     timeout=5.0
                 )
             except asyncio.TimeoutError:
