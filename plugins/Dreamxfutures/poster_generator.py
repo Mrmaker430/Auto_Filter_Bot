@@ -72,31 +72,31 @@ def _draw_telegram_watermark_badge(draw: ImageDraw.ImageDraw, x: int, y: int, us
     bbox = font.getbbox(wm_text)
     text_w = bbox[2] - bbox[0]
 
-    padding_right = 36
-    circle_radius = 36
-    circle_margin = 15
-    badge_w = circle_margin + (circle_radius * 2) + 18 + text_w + padding_right
+    padding_right = 18
+    circle_radius = 18
+    circle_margin = 8
+    badge_w = circle_margin + (circle_radius * 2) + 9 + text_w + padding_right
 
     # Dark rounded pill background
-    _draw_rounded_rectangle(draw, (x, y - 6, x + badge_w, y + 84), radius=45, fill=(35, 35, 40, 245))
+    _draw_rounded_rectangle(draw, (x, y - 3, x + badge_w, y + 42), radius=22, fill=(35, 35, 40, 245))
 
     # Blue Telegram circle
     circle_cx = x + circle_margin + circle_radius
-    circle_cy = y + 39
+    circle_cy = y + 20
     draw.ellipse(
         (circle_cx - circle_radius, circle_cy - circle_radius, circle_cx + circle_radius, circle_cy + circle_radius),
         fill=(40, 168, 233, 255)
     )
 
     # Paper plane icon inside blue circle
-    wing1 = [(circle_cx + 18, circle_cy - 18), (circle_cx - 18, circle_cy - 3), (circle_cx, circle_cy + 3)]
-    wing2 = [(circle_cx + 18, circle_cy - 18), (circle_cx, circle_cy + 3), (circle_cx - 3, circle_cy + 18)]
+    wing1 = [(circle_cx + 9, circle_cy - 9), (circle_cx - 9, circle_cy - 2), (circle_cx, circle_cy + 2)]
+    wing2 = [(circle_cx + 9, circle_cy - 9), (circle_cx, circle_cy + 2), (circle_cx - 2, circle_cy + 9)]
     draw.polygon(wing1, fill=(255, 255, 255, 255))
     draw.polygon(wing2, fill=(215, 235, 250, 255))
 
     # Username text inside pill
-    text_x = circle_cx + circle_radius + 18
-    draw.text((text_x, y + 39), wm_text, font=font, fill=(255, 255, 255, 255), anchor="lm")
+    text_x = circle_cx + circle_radius + 9
+    draw.text((text_x, y + 20), wm_text, font=font, fill=(255, 255, 255, 255), anchor="lm")
 
     return badge_w
 
@@ -193,10 +193,10 @@ def _draw_ott_badges(draw: ImageDraw.ImageDraw, ott_list: list[str], canvas_w: i
     if not ott_list:
         return
 
-    curr_x = canvas_w - 75  # Top right corner right margin
-    y = 75                  # Top right corner y position
-    badge_h = 96
-    radius = 36
+    curr_x = canvas_w - 38  # Top right corner right margin
+    y = 38                  # Top right corner y position
+    badge_h = 48
+    radius = 18
 
     for ott in ott_list:
         key = ott.upper().strip()
@@ -222,15 +222,15 @@ def _draw_ott_badges(draw: ImageDraw.ImageDraw, ott_list: list[str], canvas_w: i
 
         bbox = font.getbbox(label_text)
         text_w = bbox[2] - bbox[0]
-        padding_h = 42
-        badge_w = max(165, text_w + (padding_h * 2))
+        padding_h = 21
+        badge_w = max(82, text_w + (padding_h * 2))
 
         box_x1 = curr_x - badge_w
         box_y1 = y
         box_x2 = curr_x
         box_y2 = y + badge_h
 
-        if box_x1 < 750:
+        if box_x1 < 375:
             break
 
         _draw_rounded_rectangle(
@@ -239,7 +239,7 @@ def _draw_ott_badges(draw: ImageDraw.ImageDraw, ott_list: list[str], canvas_w: i
             radius=radius,
             fill=bg_col,
             outline=border_col,
-            width=6 if border_col else 3
+            width=3 if border_col else 2
         )
 
         draw.text(
@@ -250,7 +250,7 @@ def _draw_ott_badges(draw: ImageDraw.ImageDraw, ott_list: list[str], canvas_w: i
             anchor="mm"
         )
 
-        curr_x = box_x1 - 30  # Move left for next OTT badge
+        curr_x = box_x1 - 15  # Move left for next OTT badge
 
 def _format_runtime(runtime_val) -> str:
     if not runtime_val or str(runtime_val).upper() in ("N/A", "NONE"):
@@ -274,7 +274,7 @@ def _format_runtime(runtime_val) -> str:
 
 async def generate_movie_poster(details: dict, channel_username: str = "@cholochhitro") -> BytesIO | None:
     """
-    Generates a 4K resolution (3840x2160) landscape movie update poster.
+    Generates a 1080p resolution (1920x1080) landscape movie update poster.
     details dictionary expected keys:
         - title: str
         - localized_title: str
@@ -290,7 +290,7 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         - ott_platform: str / list
     """
     try:
-        width, height = 3840, 2160
+        width, height = 1920, 1080
         canvas = Image.new("RGBA", (width, height), (15, 15, 20, 255))
 
         # 1. Fetch images asynchronously (including primary_thumb fallback)
@@ -318,7 +318,7 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         if backdrop_img:
             if is_same_as_poster:
                 # Apply Gaussian blur only if backdrop is identical to vertical mini poster
-                blurred_bg = backdrop_img.filter(ImageFilter.GaussianBlur(50))
+                blurred_bg = backdrop_img.filter(ImageFilter.GaussianBlur(25))
                 bg_aspect = blurred_bg.width / blurred_bg.height
                 target_h = height
                 target_w = int(height * bg_aspect)
@@ -347,32 +347,32 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         draw_grad = ImageDraw.Draw(gradient)
 
         for y_i in range(height):
-            if y_i < 600:
-                alpha = int(25 * (y_i / 600))
-            elif y_i < 1200:
-                alpha = int(25 + 45 * ((y_i - 600) / 600))
+            if y_i < 300:
+                alpha = int(25 * (y_i / 300))
+            elif y_i < 600:
+                alpha = int(25 + 45 * ((y_i - 300) / 300))
             else:
-                alpha = int(70 + 55 * ((y_i - 1200) / 960))
+                alpha = int(70 + 55 * ((y_i - 600) / 480))
             draw_grad.line([(0, y_i), (width, y_i)], fill=(5, 5, 10, alpha))
 
         canvas = Image.alpha_composite(canvas, gradient)
         draw = ImageDraw.Draw(canvas)
 
-        # Fonts for 4K
-        font_rating_star = _get_font(SANS_BOLD_FONT_PATH, 78)
-        font_rating_num = _get_font(SANS_BOLD_FONT_PATH, 78)
-        font_badge = _get_font(SANS_BOLD_FONT_PATH, 54)
-        font_ott_badge = _get_font(SANS_BOLD_FONT_PATH, 48)
-        font_plot = _get_font(SANS_BOLD_FONT_PATH, 63)  # Bold plot font
+        # Fonts for 1080p
+        font_rating_star = _get_font(SANS_BOLD_FONT_PATH, 39)
+        font_rating_num = _get_font(SANS_BOLD_FONT_PATH, 39)
+        font_badge = _get_font(SANS_BOLD_FONT_PATH, 27)
+        font_ott_badge = _get_font(SANS_BOLD_FONT_PATH, 24)
+        font_plot = _get_font(SANS_BOLD_FONT_PATH, 31)  # Bold plot font
 
         # Draw OTT Badges at Top-Right Corner
         ott_list = _extract_ott_list(details)
         _draw_ott_badges(draw, ott_list, width, font_ott_badge)
 
         # 3. Bottom Left Portrait Poster Card
-        card_x, card_y = 165, 990
-        card_w, card_h = 690, 1035
-        card_radius = 54
+        card_x, card_y = 82, 495
+        card_w, card_h = 345, 518
+        card_radius = 27
 
         if poster_img:
             p_resized = poster_img.resize((card_w, card_h), Image.LANCZOS)
@@ -386,17 +386,17 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
             (card_x, card_y, card_x + card_w, card_y + card_h),
             radius=card_radius,
             outline=(255, 255, 255, 240),
-            width=9
+            width=5
         )
 
         # 4. Main Title Logo / Title Text Area (Right of Poster Card)
-        start_right_x = 930
-        curr_y = 1050
+        start_right_x = 465
+        curr_y = 525
 
         title_text = str(details.get("title") or "").upper().strip()
 
         if logo_img:
-            max_logo_w, max_logo_h = 1560, 390
+            max_logo_w, max_logo_h = 780, 195
             logo_w, logo_h = logo_img.size
             ratio = min(max_logo_w / logo_w, max_logo_h / logo_h)
             new_logo_w = max(1, int(logo_w * ratio))
@@ -405,19 +405,19 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
             logo_resized = logo_img.resize((new_logo_w, new_logo_h), Image.LANCZOS)
             canvas.paste(logo_resized, (start_right_x, curr_y), logo_resized)
             draw = ImageDraw.Draw(canvas)
-            curr_y += new_logo_h + 45
+            curr_y += new_logo_h + 22
         else:
             styled_title = Fonts.serief(title_text) if title_text else "MOVIE UPDATE"
-            font_title_main = _get_font(SERIF_BOLD_FONT_PATH, 162 if len(styled_title) <= 12 else 126)
-            draw.text((start_right_x + 6, curr_y + 6), styled_title, font=font_title_main, fill=(0, 0, 0, 180), anchor="lt")
+            font_title_main = _get_font(SERIF_BOLD_FONT_PATH, 81 if len(styled_title) <= 12 else 63)
+            draw.text((start_right_x + 3, curr_y + 3), styled_title, font=font_title_main, fill=(0, 0, 0, 180), anchor="lt")
             draw.text((start_right_x, curr_y), styled_title, font=font_title_main, fill=(255, 255, 255, 255), anchor="lt")
             bbox = font_title_main.getbbox(styled_title)
-            curr_y += (bbox[3] - bbox[1]) + 45
+            curr_y += (bbox[3] - bbox[1]) + 22
 
         # White Accent Underline
-        line_w = 480
-        draw.line([(start_right_x, curr_y), (start_right_x + line_w, curr_y)], fill=(255, 255, 255, 220), width=12)
-        curr_y += 60
+        line_w = 240
+        draw.line([(start_right_x, curr_y), (start_right_x + line_w, curr_y)], fill=(255, 255, 255, 220), width=6)
+        curr_y += 30
 
         # 5. Rating & Badges Row
         row_y = curr_y
@@ -425,30 +425,30 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
 
         # Star ★ Rating
         rating_val = str(details.get("rating") or "N/A")
-        draw.text((curr_badge_x, row_y - 6), "★", font=font_rating_star, fill=(255, 204, 0, 255))
-        draw.text((curr_badge_x + 84, row_y - 9), f" {rating_val}", font=font_rating_num, fill=(255, 255, 255, 255))
-        curr_badge_x += 285
+        draw.text((curr_badge_x, row_y - 3), "★", font=font_rating_star, fill=(255, 204, 0, 255))
+        draw.text((curr_badge_x + 42, row_y - 5), f" {rating_val}", font=font_rating_num, fill=(255, 255, 255, 255))
+        curr_badge_x += 142
 
         # IMDb Badge
-        _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 6, curr_badge_x + 210, row_y + 84), radius=36, fill=(245, 197, 24, 255))
-        draw.text((curr_badge_x + 105, row_y + 39), "IMDb", font=font_badge, fill=(0, 0, 0, 255), anchor="mm")
-        curr_badge_x += 240
+        _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 3, curr_badge_x + 105, row_y + 42), radius=18, fill=(245, 197, 24, 255))
+        draw.text((curr_badge_x + 52, row_y + 20), "IMDb", font=font_badge, fill=(0, 0, 0, 255), anchor="mm")
+        curr_badge_x += 120
 
         # Year Badge
         year_str = str(details.get("year") or "").strip()
         if year_str:
-            _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 6, curr_badge_x + 210, row_y + 84), radius=36, fill=(225, 75, 50, 255))
-            draw.text((curr_badge_x + 105, row_y + 39), year_str, font=font_badge, fill=(255, 255, 255, 255), anchor="mm")
-            curr_badge_x += 240
+            _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 3, curr_badge_x + 105, row_y + 42), radius=18, fill=(225, 75, 50, 255))
+            draw.text((curr_badge_x + 52, row_y + 20), year_str, font=font_badge, fill=(255, 255, 255, 255), anchor="mm")
+            curr_badge_x += 120
 
         # Runtime Badge
         runtime_fmt = _format_runtime(details.get("runtime"))
         if runtime_fmt:
             rt_bbox = font_badge.getbbox(runtime_fmt)
-            rt_w = (rt_bbox[2] - rt_bbox[0]) + 72
-            _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 6, curr_badge_x + rt_w, row_y + 84), radius=36, fill=(45, 140, 180, 255))
-            draw.text((curr_badge_x + rt_w // 2, row_y + 39), runtime_fmt, font=font_badge, fill=(255, 255, 255, 255), anchor="mm")
-            curr_badge_x += rt_w + 30
+            rt_w = (rt_bbox[2] - rt_bbox[0]) + 36
+            _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 3, curr_badge_x + rt_w, row_y + 42), radius=18, fill=(45, 140, 180, 255))
+            draw.text((curr_badge_x + rt_w // 2, row_y + 20), runtime_fmt, font=font_badge, fill=(255, 255, 255, 255), anchor="mm")
+            curr_badge_x += rt_w + 15
 
         # Genre / Category Badges
         genres_raw = details.get("genres") or []
@@ -461,29 +461,29 @@ async def generate_movie_poster(details: dict, channel_username: str = "@choloch
         for idx, g in enumerate(genres_list[:2]):
             g_text = str(g).upper()
             g_bbox = font_badge.getbbox(g_text)
-            g_w = (g_bbox[2] - g_bbox[0]) + 78
-            if curr_badge_x + g_w > width - 600:
+            g_w = (g_bbox[2] - g_bbox[0]) + 39
+            if curr_badge_x + g_w > width - 300:
                 break
             bg_col = badge_colors[idx % len(badge_colors)]
-            _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 6, curr_badge_x + g_w, row_y + 84), radius=36, fill=bg_col)
-            draw.text((curr_badge_x + g_w // 2, row_y + 39), g_text, font=font_badge, fill=(255, 255, 255, 255), anchor="mm")
-            curr_badge_x += g_w + 30
+            _draw_rounded_rectangle(draw, (curr_badge_x, row_y - 3, curr_badge_x + g_w, row_y + 42), radius=18, fill=bg_col)
+            draw.text((curr_badge_x + g_w // 2, row_y + 20), g_text, font=font_badge, fill=(255, 255, 255, 255), anchor="mm")
+            curr_badge_x += g_w + 15
 
         # Watermark Pill Badge (Placed besides the genres)
         if channel_username:
             wm_badge_w = _draw_telegram_watermark_badge(draw, curr_badge_x, row_y, channel_username, font_badge)
-            curr_badge_x += wm_badge_w + 30
+            curr_badge_x += wm_badge_w + 15
 
         # 6. Plot Description Area (Bold text with shadow)
-        plot_y = row_y + 126
+        plot_y = row_y + 63
         plot_text = str(details.get("plot") or "").strip()
         if plot_text and plot_text != "N/A":
-            max_plot_w = width - start_right_x - 90
+            max_plot_w = width - start_right_x - 45
             wrapped_lines = _wrap_text(plot_text, font_plot, max_width=max_plot_w, max_lines=3)
             for line in wrapped_lines:
-                draw.text((start_right_x + 3, plot_y + 3), line, font=font_plot, fill=(0, 0, 0, 200))
+                draw.text((start_right_x + 2, plot_y + 2), line, font=font_plot, fill=(0, 0, 0, 200))
                 draw.text((start_right_x, plot_y), line, font=font_plot, fill=(255, 255, 255, 255))
-                plot_y += 84
+                plot_y += 42
 
         # Convert to BytesIO buffer
         output_buffer = BytesIO()
