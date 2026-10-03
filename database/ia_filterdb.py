@@ -466,3 +466,28 @@ async def dreamxbotz_get_series(limit: int = 30) -> Dict[str, List[int]]:
     except Exception as e:
         logger.error(f"Error in dreamxbotz_get_series: {e}")
         return []
+
+
+async def remove_cover_by_query(query: str) -> int:
+    query = query.strip()
+    if not query:
+        return 0
+    if " " in query:
+        words = [re.escape(w) for w in query.split() if w]
+        raw_pattern = r".*[\s\.\+\-_]".join(words) if words else r"."
+    else:
+        raw_pattern = r"(\b|[\.\+\-_])" + re.escape(query) + r"(\b|[\.\+\-_])"
+    try:
+        regex = compile_regex(raw_pattern)
+    except re.error:
+        regex = re.compile(re.escape(query), re.IGNORECASE)
+
+    filter_mongo = {"$or": [{"file_name": regex}, {"caption": regex}]}
+    update_op = {"$unset": {"cover": ""}}
+
+    res1 = await Media.collection.update_many(filter_mongo, update_op)
+    modified = res1.modified_count
+    if MULTIPLE_DB:
+        res2 = await Media2.collection.update_many(filter_mongo, update_op)
+        modified += res2.modified_count
+    return modified

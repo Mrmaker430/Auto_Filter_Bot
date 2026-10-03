@@ -15,7 +15,7 @@ from database.config_db import mdb
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardMarkup
 from pyrogram import Client, filters, enums, StopPropagation
 from pyrogram.errors import FloodWait, UserNotParticipant , ChannelInvalid, PeerIdInvalid
-from database.ia_filterdb import Media, Media2, get_file_details, unpack_new_file_id, get_bad_files, save_file
+from database.ia_filterdb import Media, Media2, get_file_details, unpack_new_file_id, get_bad_files, save_file, remove_cover_by_query, dreamxbotz_clean_title
 from database.users_chats_db import db
 from info import (
     LOG_CHANNEL, IMDB_TEMPLATE, IS_VERIFY, TUTORIAL, TUTORIAL_2, TUTORIAL_3, EMOJI_MODE, REACTIONS,
@@ -25,7 +25,7 @@ from info import (
     LOG_CHANNEL, SHORTENER_API, SHORTENER_API2, SHORTENER_API3, SHORTENER_WEBSITE, SHORTENER_WEBSITE2, SHORTENER_WEBSITE3,
     
 )
-from utils import get_settings, save_group_settings, is_subscribed, is_req_subscribed, get_size, get_shortlink, is_check_admin, temp, get_readable_time, get_time, generate_settings_text, log_error, clean_filename, get_random_mix_id, get_or_generate_cover
+from utils import get_settings, save_group_settings, is_subscribed, is_req_subscribed, get_size, get_shortlink, is_check_admin, temp, get_readable_time, get_time, generate_settings_text, log_error, clean_filename, get_random_mix_id, get_or_generate_cover, clear_poster_cache
 
 logger = logging.getLogger(__name__)
 
@@ -1660,3 +1660,62 @@ async def reset_limit_cmd(client, message):
 
     await db.reset_user_limit(user_id)
     await message.reply_text(f"<b>✅ Successfully reset daily limitation for user {user_mention} (<code>{user_id}</code>).</b>")
+
+
+@Client.on_message(filters.command("remove_cover"))
+async def remove_cover_cmd(client, message):
+    target_name = None
+    if len(message.command) > 1:
+        target_name = message.text.split(" ", 1)[1].strip()
+    elif message.reply_to_message:
+        reply = message.reply_to_message
+        for file_type in ("document", "video", "audio"):
+            media = getattr(reply, file_type, None)
+            if media is not None:
+                target_name = getattr(media, "file_name", None)
+                break
+        if not target_name:
+            target_name = reply.caption or reply.text
+
+    if not target_name:
+        return await message.reply_text(
+            "<b>Usage:</b> <code>/remove_cover {filename}</code>\n"
+            "<i>Or reply to a file message with <code>/remove_cover</code></i>"
+        )
+
+    sts = await message.reply_text("<b>Pʀᴏᴄᴇssɪɴɢ ᴄᴏᴠᴇʀ ʀᴇᴍᴏᴠᴀʟ... ⏳</b>", quote=True)
+
+    try:
+        clean_title = await dreamxbotz_clean_title(target_name)
+    except Exception:
+        clean_title = clean_filename(target_name)
+
+    # 1. Disable cover in database
+    await db.add_disabled_cover(target_name)
+    if clean_title and clean_title != target_name:
+        await db.add_disabled_cover(clean_title)
+
+    # 2. Clear stored movie_updates poster data
+    if hasattr(db, "movie_updates") and db.movie_updates is not None:
+        try:
+            await db.movie_updates.update_many(
+                {"_id": {"$in": [target_name, clean_title, clean_title.strip().lower()]}},
+                {"$unset": {"poster_url": "", "backdrop_url": "", "primary_thumb": ""}, "$set": {"disabled": True}}
+            )
+        except Exception as e:
+            logger.error(f"Error updating movie_updates in remove_cover: {e}")
+
+    # 3. Remove cover from matching Media & Media2 records
+    modified_count = await remove_cover_by_query(target_name)
+    if clean_title and clean_title != target_name:
+        modified_count += await remove_cover_by_query(clean_title)
+
+    # 4. Clear memory caches
+    clear_poster_cache(target_name)
+    clear_poster_cache(clean_title)
+
+    await sts.edit(
+        f"<b>✅ Covers successfully removed for '<code>{target_name}</code>'!</b>\n\n"
+        f"📁 <i>Updated {modified_count} database file record(s).</i>\n"
+        f"⚠️ <i>Cover generation disabled; files will now use their actual default thumbnails.</i>"
+    )

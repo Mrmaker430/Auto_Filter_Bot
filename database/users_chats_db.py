@@ -33,6 +33,41 @@ class Database:
         self.connection = self.db.connections
         self.file_limits = self.db.file_limits
         self.pinterest_limits = self.db.pinterest_limits
+        self.disabled_covers = self.db.disabled_covers
+
+    async def add_disabled_cover(self, title: str) -> bool:
+        if not title:
+            return False
+        clean_key = title.strip().lower()
+        await self.disabled_covers.update_one(
+            {"_id": clean_key},
+            {"$set": {"disabled": True, "title": title}},
+            upsert=True
+        )
+        return True
+
+    async def is_cover_disabled(self, title: str) -> bool:
+        if not title:
+            return False
+        clean_key = title.strip().lower()
+        try:
+            doc = await self.disabled_covers.find_one({"_id": clean_key})
+            if doc and doc.get("disabled"):
+                return True
+            movie_doc = await self.movie_updates.find_one({"_id": clean_key})
+            if movie_doc and movie_doc.get("disabled"):
+                return True
+        except Exception as e:
+            logger.warning(f"is_cover_disabled error: {e}")
+            return False
+        return False
+
+    async def remove_disabled_cover(self, title: str) -> bool:
+        if not title:
+            return False
+        clean_key = title.strip().lower()
+        await self.disabled_covers.delete_one({"_id": clean_key})
+        return True
 
     async def add_name(self, filename):
         if await self.movie_updates.find_one({'_id': filename}):

@@ -1196,6 +1196,15 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
 POSTER_CACHE = {}
 MAX_POSTER_CACHE_SIZE = 100
 
+def clear_poster_cache(cache_key: Optional[str] = None):
+    if cache_key:
+        key = cache_key.strip().lower()
+        POSTER_CACHE.pop(key, None)
+        POSTER_RESULT_CACHE.pop(key, None)
+    else:
+        POSTER_CACHE.clear()
+        POSTER_RESULT_CACHE.clear()
+
 async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = None) -> Union[io.BytesIO, str, None]:
     if not COVERX:
         return fallback_cover
@@ -1213,8 +1222,13 @@ async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = 
 
     cache_key = clean_title.strip().lower()
 
+    if await db.is_cover_disabled(clean_title) or await db.is_cover_disabled(file_name):
+        return None
+
     if cache_key in POSTER_CACHE:
         cached = POSTER_CACHE[cache_key]
+        if cached is None:
+            return None
         if isinstance(cached, bytes):
             buf = io.BytesIO(cached)
             buf.name = "cover.jpg"
