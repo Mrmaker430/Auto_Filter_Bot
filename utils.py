@@ -1079,7 +1079,7 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
                 cap += "\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
                 for idx, file in enumerate(files, start=offset + 1):
                         cap += (
-                            f"<b>{idx}. "
+                            f"<b>〈 {idx} 〉➠ "
                             f"<a href='https://telegram.me/{temp.U_NAME}"
                             f"?start=file_{chat_id}_{file.file_id}'>"
                             f"[{get_size(file.file_size)}] "
@@ -1129,7 +1129,7 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
                     cap += "\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
                     for idx, file in enumerate(files, start=offset+1):
                         cap += (
-                            f"<b>{idx}. "
+                            f"<b>〈 {idx} 〉➠ "
                             f"<a href='https://telegram.me/{temp.U_NAME}"
                             f"?start=file_{chat_id}_{file.file_id}'>"
                             f"[{get_size(file.file_size)}] "
@@ -1156,7 +1156,7 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
                     cap += "\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
                     for idx, file in enumerate(files, start=offset + 1):
                         cap += (
-                            f"<b>{idx}. "
+                            f"<b>〈 {idx} 〉➠ "
                             f"<a href='https://telegram.me/{temp.U_NAME}"
                             f"?start=file_{chat_id}_{file.file_id}'>"
                             f"[{get_size(file.file_size)}] "
@@ -1184,7 +1184,7 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
             cap += "\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
             for idx, file in enumerate(files, start=offset + 1):
                         cap += (
-                            f"<b>{idx}. "
+                            f"<b>〈 {idx} 〉➠ "
                             f"<a href='https://telegram.me/{temp.U_NAME}"
                             f"?start=file_{chat_id}_{file.file_id}'>"
                             f"[{get_size(file.file_size)}] "
