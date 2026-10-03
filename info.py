@@ -274,6 +274,7 @@ Bot_cmds = {
     "maintenance": "Maintenance Mode (Admin Only)",
     "check_limit": "Cʜᴇᴄᴋ ᴀ ᴜsᴇʀ ʟɪᴍɪᴛ",
     "reset_limit": "Rᴇsᴇᴛ ᴀ ᴜsᴇʀ's ʟɪᴍɪᴛ",
+    "remove_cover": "Rᴇᴍᴏᴠᴇ ᴄᴏᴠᴇʀ ᴀɴᴅ ᴅɪsᴀʙʟᴇ ᴀᴛᴛᴀᴄʜɪɴɢ",
 }
 
 
