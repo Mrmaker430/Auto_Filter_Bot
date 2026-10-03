@@ -1486,7 +1486,7 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
                         search = search + x + " "
                 search = re.sub(r"\b(pl(i|e)*?(s|z+|ease|se|ese|(e+)s(e)?)|((send|snd|giv(e)?|gib)(\sme)?)|movie(s)?|new|latest|bro|bruh|broh|helo|that|find|dubbed|link|venum|iruka|pannunga|pannungga|anuppunga|anupunga|anuppungga|anupungga|film|undo|kitti|kitty|tharu|kittumo|kittum|movie|any(one)|with\ssubtitle(s)?)\b", "", search, flags=re.IGNORECASE)
                 search = search.replace("-", " ")
-                search = re.sub(r"[:']", "", search)
+                search = re.sub(r"[:'\"\"'‟”]", "", search)
                 search = re.sub(r"\s+", " ", search).strip()
 
             key = f"{message.chat.id}-{message.id}"
@@ -1608,7 +1608,6 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
                                "Sᴇɴᴅ Aʟʟ", callback_data=f"sendfiles#{key}", style=enums.ButtonStyle.SUCCESS)
                        ])
 
-        btn = btn + [[InlineKeyboardButton("🚫 Close Menu", callback_data="close_data", style=enums.ButtonStyle.DANGER)]]
 
         if offset != "":
             req = message.from_user.id if message.from_user else 0
@@ -1696,7 +1695,7 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
             if not settings.get('button'):
                 cap += "\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
                 for idx, file in enumerate(files, start=1):
-                    cap += f"<b>{idx}. <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n</b>"
+                    cap += f"<b>〈 {idx} 〉➠ <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n</b>"
                 cap += "</blockquote>"
         else:
             temp.IMDB_CAP[message.from_user.id] = None
@@ -1706,7 +1705,7 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
                 else:
                     cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention if message and message.from_user else 'User'}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title if message and message.chat else temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'}</b>\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
                     for idx, file in enumerate(files, start=1):
-                        cap += f"<b>{idx}. <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n</b>"
+                        cap += f"<b>〈 {idx} 〉➠ <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n</b>"
                     cap += "</blockquote>"
             else:
                 if settings.get('button'):
@@ -1714,7 +1713,7 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
                 else:
                     cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n🧱 ᴛᴏᴛᴀʟ ꜰɪʟᴇꜱ : <code>{total_results}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention if message and message.from_user else 'User'}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title if message and message.chat else temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'}</b>\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
                     for idx, file in enumerate(files, start=1):
-                        cap += f"<b>{idx}. <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n</b>"
+                        cap += f"<b>〈 {idx} 〉➠ <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n</b>"
                     cap += "</blockquote>"
         sent = None
         try:
