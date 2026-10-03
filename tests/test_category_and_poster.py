@@ -108,7 +108,7 @@ async def test_get_cap_blockquote_formatting():
     settings = {"imdb": False, "button": False}
 
     cap = await get_cap(settings, "0.50", files, DummyQuery(), 2, "Avatar")
-    assert "<blockquote expandable>" in cap
+    assert "<blockquote expandable>" not in cap
     assert "<b><u>Your Requested Files Are Here</u></b>" in cap
-    assert "</blockquote>" in cap
+    assert "</blockquote>" not in cap
     assert "[1.00 GB] Avatar.2009.1080p.mkv" in cap

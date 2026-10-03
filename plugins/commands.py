@@ -408,12 +408,10 @@ async def start(client, message):
                 raise ValueError("Invalid encoded data")
             file_id = raw[sep + 1:].decode("latin1")
             try:
-                cover = None
-                if COVERX:
-                    details = await get_file_details(file_id)
-                    old_cover = details[0].cover if details and details[0].cover else None
-                    fname = details[0].file_name if details and details[0].file_name else ""
-                    cover = await get_or_generate_cover(fname, old_cover)
+                details = await get_file_details(file_id)
+                old_cover = details[0].cover if details and details[0].cover else None
+                fname = details[0].file_name if details and details[0].file_name else ""
+                cover = await get_or_generate_cover(fname, old_cover)
                 btn = await stream_buttons(message.from_user.id, file_id)
                 msg = await client.send_cached_media(
                     chat_id=message.from_user.id,

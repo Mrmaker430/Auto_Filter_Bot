@@ -1076,7 +1076,7 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
             IMDB_CAP = temp.IMDB_CAP.get(query.from_user.id)
             if IMDB_CAP:
                 cap = IMDB_CAP
-                cap += "\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
+                cap += "\n\n<b><u>Your Requested Files Are Here</u></b>\n\n"
                 for idx, file in enumerate(files, start=offset + 1):
                         cap += (
                             f"<b>〈 {idx} 〉➠ "
@@ -1086,7 +1086,6 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
                             f"{clean_filename(file.file_name)}\n"
                             f"</a></b>"
                         )
-                cap += "</blockquote>"
             else:
                 if settings["imdb"]:
                     imdb = await get_posterx(search, file=(files[0]).file_name) if TMDB_ON_SEARCH else await get_poster(search, file=(files[0]).file_name)
@@ -1126,7 +1125,7 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
                         **locals()
                     )
                     
-                    cap += "\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
+                    cap += "\n\n<b><u>Your Requested Files Are Here</u></b>\n\n"
                     for idx, file in enumerate(files, start=offset+1):
                         cap += (
                             f"<b>〈 {idx} 〉➠ "
@@ -1136,7 +1135,6 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
                             f"{clean_filename(file.file_name)}\n"
                             f"</a></b>"
                         )
-                    cap += "</blockquote>"
                 else:
                     if ULTRA_FAST_MODE:
                         cap = (
@@ -1153,7 +1151,7 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
                             f"📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {query.from_user.mention}\n"
                             f"⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ :⚡ {query.message.chat.title if hasattr(query, 'message') and query.message and query.message.chat else temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'}\n</b>"
                         )
-                    cap += "\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
+                    cap += "\n\n<b><u>Your Requested Files Are Here</u></b>\n\n"
                     for idx, file in enumerate(files, start=offset + 1):
                         cap += (
                             f"<b>〈 {idx} 〉➠ "
@@ -1163,7 +1161,6 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
                             f"{clean_filename(file.file_name)}\n"
                             f"</a></b>"
                         )
-                    cap += "</blockquote>"
 
         else:
             if ULTRA_FAST_MODE:
@@ -1181,7 +1178,7 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
                         f"⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {query.message.chat.title if hasattr(query, 'message') and query.message and query.message.chat else temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'}\n</b>"
                 )
 
-            cap += "\n\n<blockquote expandable><b><u>Your Requested Files Are Here</u></b>\n\n"
+            cap += "\n\n<b><u>Your Requested Files Are Here</u></b>\n\n"
             for idx, file in enumerate(files, start=offset + 1):
                         cap += (
                             f"<b>〈 {idx} 〉➠ "
@@ -1191,7 +1188,6 @@ async def get_cap(settings, remaining_seconds, files, query, total_results, sear
                             f"{clean_filename(file.file_name)}\n"
                             f"</a></b>"
                         )
-            cap += "</blockquote>"
         return cap
     except Exception as e:
         logger.error(f"Error in get_cap: {e}")
@@ -1201,8 +1197,6 @@ POSTER_CACHE = {}
 MAX_POSTER_CACHE_SIZE = 100
 
 async def get_or_generate_cover(file_name: str, fallback_cover: Optional[str] = None) -> Union[io.BytesIO, str, None]:
-    if fallback_cover:
-        return fallback_cover
     if not COVERX:
         return fallback_cover
     if not file_name:
