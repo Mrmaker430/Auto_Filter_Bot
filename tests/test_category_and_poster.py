@@ -112,3 +112,6 @@ async def test_get_cap_blockquote_formatting():
     assert "<b><u>Your Requested Files Are Here</u></b>" in cap
     assert "</blockquote>" not in cap
     assert "[1.00 GB] Avatar.2009.1080p.mkv" in cap
+    # Verify gaps (\n\n) between search results list items
+    assert "[1.00 GB] Avatar.2009.1080p.mkv\n\n" in cap
+    assert "[512.00 MB] Avatar.2009.720p.mkv\n\n" in cap
