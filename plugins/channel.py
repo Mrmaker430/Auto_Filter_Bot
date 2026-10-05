@@ -93,22 +93,6 @@ error_tmdb = False
 REACTION_EMOJIS = ["❤️", "🤮", "🤯", "😓"]
 
 def get_movie_update_buttons(movie_doc: dict, base_name: str) -> InlineKeyboardMarkup:
-    reactions = movie_doc.get("reactions", {}) if movie_doc else {}
-    counts = {e: 0 for e in REACTION_EMOJIS}
-    for emoji in reactions.values():
-        if emoji in counts:
-            counts[emoji] += 1
-
-    clean_base = base_name[:45]
-    reaction_buttons = [
-        InlineKeyboardButton(
-            f"{emoji} {counts[emoji]}",
-            callback_data=f"mreact:{emoji}:{clean_base}",
-            style=enums.ButtonStyle.PRIMARY
-        )
-        for emoji in REACTION_EMOJIS
-    ]
-
     search_button = InlineKeyboardButton(
         '🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎',
         url=GRP_LNK,
@@ -116,7 +100,6 @@ def get_movie_update_buttons(movie_doc: dict, base_name: str) -> InlineKeyboardM
     )
 
     return InlineKeyboardMarkup([
-        reaction_buttons,
         [search_button]
     ])
 

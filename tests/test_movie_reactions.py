@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from plugins.channel import get_movie_update_buttons, REACTION_EMOJIS, movie_reaction_callback
 from pyrogram import enums
 
-def test_get_movie_update_buttons_counts():
+def test_get_movie_update_buttons_no_reaction_panel():
     movie_doc = {
         "reactions": {
             "1001": "❤️",
@@ -14,27 +14,10 @@ def test_get_movie_update_buttons_counts():
     }
     keyboard = get_movie_update_buttons(movie_doc, "Inception 2010")
 
-    # 2 rows of buttons
-    assert len(keyboard.inline_keyboard) == 2
+    # 1 row of buttons (search button only, reaction panel removed)
+    assert len(keyboard.inline_keyboard) == 1
 
-    # Row 1: Reactions
-    reaction_row = keyboard.inline_keyboard[0]
-    assert len(reaction_row) == 4
-    assert reaction_row[0].text == "❤️ 2"
-    assert reaction_row[0].callback_data == "mreact:❤️:Inception 2010"
-    assert reaction_row[0].style == enums.ButtonStyle.PRIMARY
-
-    assert reaction_row[1].text == "🤮 0"
-    assert reaction_row[1].style == enums.ButtonStyle.PRIMARY
-
-    assert reaction_row[2].text == "🤯 1"
-    assert reaction_row[2].style == enums.ButtonStyle.PRIMARY
-
-    assert reaction_row[3].text == "😓 1"
-    assert reaction_row[3].style == enums.ButtonStyle.PRIMARY
-
-    # Row 2: Search button
-    search_row = keyboard.inline_keyboard[1]
+    search_row = keyboard.inline_keyboard[0]
     assert len(search_row) == 1
     assert search_row[0].text == "🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎"
     assert search_row[0].style == enums.ButtonStyle.SUCCESS

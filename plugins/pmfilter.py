@@ -1695,7 +1695,7 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
             if not settings.get('button'):
                 cap += "\n\n<b><u>Your Requested Files Are Here</u></b>\n\n"
                 for idx, file in enumerate(files, start=1):
-                    cap += f"<b>〈 {idx} 〉➠ <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n</b>"
+                    cap += f"<b>〈 {idx} 〉➠ <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n\n</b>"
         else:
             temp.IMDB_CAP[message.from_user.id] = None
             if ULTRA_FAST_MODE:
@@ -1704,14 +1704,14 @@ async def auto_filter(client, msg, spoll=False, search_query=None, req_user_id=N
                 else:
                     cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention if message and message.from_user else 'User'}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title if message and message.chat else temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'}</b>\n\n<b><u>Your Requested Files Are Here</u></b>\n\n"
                     for idx, file in enumerate(files, start=1):
-                        cap += f"<b>〈 {idx} 〉➠ <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n</b>"
+                        cap += f"<b>〈 {idx} 〉➠ <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n\n</b>"
             else:
                 if settings.get('button'):
                     cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n🧱 ᴛᴏᴛᴀʟ ꜰɪʟᴇꜱ : <code>{total_results}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention if message and message.from_user else 'User'}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title if message and message.chat else temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'}</b>"
                 else:
                     cap = f"<b>🏷 ᴛɪᴛʟᴇ : <code>{search}</code>\n🧱 ᴛᴏᴛᴀʟ ꜰɪʟᴇꜱ : <code>{total_results}</code>\n⏰ ʀᴇsᴜʟᴛ ɪɴ : <code>{remaining_seconds} Sᴇᴄᴏɴᴅs</code>\n\n📝 ʀᴇǫᴜᴇsᴛᴇᴅ ʙʏ : {message.from_user.mention if message and message.from_user else 'User'}\n⚜️ ᴘᴏᴡᴇʀᴇᴅ ʙʏ : ⚡ {message.chat.title if message and message.chat else temp.B_LINK or 'ᴅʀᴇᴀᴍxʙᴏᴛᴢ'}</b>\n\n<b><u>Your Requested Files Are Here</u></b>\n\n"
                     for idx, file in enumerate(files, start=1):
-                        cap += f"<b>〈 {idx} 〉➠ <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n</b>"
+                        cap += f"<b>〈 {idx} 〉➠ <a href='https://telegram.me/{temp.U_NAME}?start=file_{message.chat.id}_{file.file_id}'>[{get_size(file.file_size)}] {clean_filename(file.file_name)}</a>\n\n</b>"
         sent = None
         try:
             if imdb and imdb.get('poster'):
