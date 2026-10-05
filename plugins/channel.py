@@ -90,6 +90,83 @@ locks = defaultdict(asyncio.Lock)
 pending_updates = {}
 error_tmdb = False
 
+REACTION_EMOJIS = ["❤️", "🤮", "🤯", "😓"]
+
+def get_movie_update_buttons(movie_doc: dict, base_name: str) -> InlineKeyboardMarkup:
+    reactions = movie_doc.get("reactions", {}) if movie_doc else {}
+    counts = {e: 0 for e in REACTION_EMOJIS}
+    for emoji in reactions.values():
+        if emoji in counts:
+            counts[emoji] += 1
+
+    clean_base = base_name[:45]
+    reaction_buttons = [
+        InlineKeyboardButton(
+            f"{emoji} {counts[emoji]}",
+            callback_data=f"mreact:{emoji}:{clean_base}",
+            style=enums.ButtonStyle.PRIMARY
+        )
+        for emoji in REACTION_EMOJIS
+    ]
+
+    search_button = InlineKeyboardButton(
+        '🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎',
+        url=GRP_LNK,
+        style=enums.ButtonStyle.SUCCESS
+    )
+
+    return InlineKeyboardMarkup([
+        reaction_buttons,
+        [search_button]
+    ])
+
+@Client.on_callback_query(filters.regex(r"^mreact:"))
+async def movie_reaction_callback(bot, query):
+    try:
+        parts = query.data.split(":", 2)
+        if len(parts) < 3:
+            return await query.answer("your thought..", show_alert=True)
+
+        emoji = parts[1]
+        base_name_prefix = parts[2]
+        user_id = str(query.from_user.id)
+
+        if not hasattr(db, 'movie_updates'):
+            db.movie_updates = db.db.movie_updates
+
+        movie_doc = await db.movie_updates.find_one({"message_id": query.message.id})
+        if not movie_doc:
+            movie_doc = await db.movie_updates.find_one({"_id": {"$regex": f"^{re.escape(base_name_prefix)}", "$options": "i"}})
+
+        if not movie_doc:
+            return await query.answer("your thought..", show_alert=True)
+
+        base_name = movie_doc["_id"]
+        reactions = movie_doc.get("reactions", {})
+
+        # Per user can click one reaction; update or set user's reaction
+        reactions[user_id] = emoji
+
+        await db.movie_updates.update_one(
+            {"_id": base_name},
+            {"$set": {f"reactions.{user_id}": emoji}}
+        )
+
+        movie_doc["reactions"] = reactions
+        updated_buttons = get_movie_update_buttons(movie_doc, base_name)
+
+        try:
+            await query.edit_message_reply_markup(reply_markup=updated_buttons)
+        except MessageNotModified:
+            pass
+        except Exception as e:
+            logger.warning(f"Error updating reply markup for reaction: {e}")
+
+        await query.answer("your thought..", show_alert=True)
+    except Exception as e:
+        logger.exception(f"Error in movie_reaction_callback: {e}")
+        await query.answer("your thought..", show_alert=True)
+
 def clean_mentions_links(text: str) -> str:
     return CLEAN_PATTERN.sub("", text or "").strip()
 
@@ -386,13 +463,7 @@ async def send_movie_update(bot, base_name):
                 return None
 
             text = generate_movie_message(movie_doc, base_name)
-            buttons = InlineKeyboardMarkup([[
-                InlineKeyboardButton(
-                    '🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎',
-                    url=GRP_LNK,
-                    style=enums.ButtonStyle.SUCCESS
-                )
-            ]])
+            buttons = get_movie_update_buttons(movie_doc, base_name)
             all_ott_platforms = set()
             if movie_doc.get("ott_platform") and movie_doc.get("ott_platform") != "N/A":
                 all_ott_platforms.update(p.strip() for p in movie_doc["ott_platform"].split("|") if p.strip())
@@ -481,13 +552,7 @@ async def update_movie_message(bot, base_name):
             return
 
         text = generate_movie_message(movie_doc, base_name)
-        buttons = InlineKeyboardMarkup([[
-            InlineKeyboardButton(
-                '🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎',
-                url=GRP_LNK,
-                style=enums.ButtonStyle.SUCCESS
-            )
-        ]])
+        buttons = get_movie_update_buttons(movie_doc, base_name)
 
         message_id = movie_doc.get("message_id")
         is_photo = movie_doc.get("is_photo", False)
