@@ -278,15 +278,15 @@ Mᴇꜱꜱᴀɢᴇ : <b>{}</b>"""
     
     MOVIE_UPDATE_NOTIFY_TXT = """<blockquote>📫 𝖭𝖤𝖶 𝖥𝖨𝖫𝖤 𝖠𝖣𝖣𝖤𝖣 ✅</blockquote>
 
-🏷️ <b>Tɪᴛʟᴇ</b> : <a href={imdb_url}>{filename}</a>
+🏷️ <b>Tɪᴛʟᴇ : {filename}</b> <b><a href={imdb_url}>Mᴏʀᴇ Dᴇᴛᴀɪʟs</a></b>
 
-🎭 <b>Gᴇɴʀᴇs</b> : {genres}
-📡 <b>OTT</b> : {ott}
+🎭 <b>Gᴇɴʀᴇs : {genres}</b>
+📡 <b>OTT : {ott}</b>
 
-⏩ <b>Qᴜᴀʟɪᴛʏ</b> : {quality}
-☀️ <b>Aᴜᴅɪᴏ</b> : {language}
-🌟 <b>Rᴀᴛɪɴɢ</b> : {rating}
-{episodes}
+⏩ <b>Qᴜᴀʟɪᴛʏ : {quality}</b>
+☀️ <b>Aᴜᴅɪᴏ : {language}</b>
+🌟 <b>Rᴀᴛɪɴɢ : {rating}</b>
+<b>{episodes}</b>
 
 """
 
