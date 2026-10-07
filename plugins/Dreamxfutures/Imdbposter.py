@@ -186,9 +186,51 @@ async def _tmdb_get(path, params=None, api_key=None):
         return await resp.json()
 
 
+def is_korean_media(item: dict, media_type: str = "tv") -> bool:
+    """Check if TMDB item is Korean drama/movie based on origin_country or original_language."""
+    if not item or not isinstance(item, dict):
+        return False
+    if media_type in ['tv', 'series', 'show', 'shows', 'kdrama', 'k-drama']:
+        return "KR" in item.get("origin_country", []) or item.get("original_language") == "ko"
+    return item.get("original_language") == "ko" or "KR" in item.get("origin_country", [])
+
+
+async def search_korean_media(query: str, media_type: str = "tv", limit: int = 10, api_key=None) -> list:
+    """Search Korean dramas or movies on TMDB."""
+    endpoint = 'search/tv' if media_type in ['tv', 'series', 'show', 'shows', 'kdrama', 'k-drama'] else 'search/movie'
+    data = await _tmdb_get(endpoint, params={'query': query, 'include_adult': 'false'}, api_key=api_key or TMDB_API_KEY or None)
+    results = data.get('results', []) if isinstance(data, dict) else []
+    korean_results = [item for item in results if is_korean_media(item, media_type)]
+    return korean_results[:limit]
+
+
+async def get_popular_korean_media(media_type: str = "tv", limit: int = 10, api_key=None) -> list:
+    """Fetch popular Korean dramas or movies from TMDB."""
+    if media_type in ['tv', 'series', 'show', 'shows', 'kdrama', 'k-drama']:
+        endpoint = 'discover/tv'
+        params = {
+            'with_origin_country': 'KR',
+            'sort_by': 'popularity.desc',
+            'page': 1
+        }
+    else:
+        endpoint = 'discover/movie'
+        params = {
+            'with_original_language': 'ko',
+            'sort_by': 'popularity.desc',
+            'page': 1
+        }
+    data = await _tmdb_get(endpoint, params=params, api_key=api_key or TMDB_API_KEY or None)
+    results = data.get('results', []) if isinstance(data, dict) else []
+    return results[:limit]
+
+
 async def _fetch_media_details(media_type: str, media_id: int, api_key=None):
     """Fetch full details for a movie or TV show from TMDB."""
-    params = {'append_to_response': 'credits,external_ids,alternative_titles,release_dates,images'}
+    params = {
+        'append_to_response': 'credits,external_ids,alternative_titles,release_dates,images',
+        'include_image_language': 'en,ko,null'
+    }
     return await _tmdb_get(f"{media_type}/{media_id}", params=params, api_key=api_key)
 
 
@@ -196,21 +238,26 @@ async def _search_media_id(query: str, api_key=None, category=None):
     """Search TMDB for the best matching movie/TV show and return (media_type, media_id)."""
     cleaned, season, episode = _clean_query(query)
     title, year = _extract_title_and_year(cleaned)
-    if not title:
+    raw_title, raw_year = _extract_title_and_year(query.strip())
+    if not title and not raw_title:
         return None, None
 
-    words = title.split()
+    # Build fallback queries — preserving raw title as first option if valid
+    queries_to_try = []
+    if raw_title and len(raw_title) > 0:
+        queries_to_try.append(raw_title)
+    if title and title not in queries_to_try:
+        queries_to_try.append(title)
 
-    # Build fallback queries — NEVER fall back to a single word.
-    queries_to_try = [title]
+    words = (title or raw_title).split()
     if len(words) >= 3:
         queries_to_try.append(" ".join(words[:-1]))
-    queries_to_try = list(dict.fromkeys(queries_to_try))
+    queries_to_try = list(dict.fromkeys([q for q in queries_to_try if q]))
 
     # Determine endpoint based on category or SxxExx
     if category in ['movie', 'movies']:
         endpoint = 'search/movie'
-    elif category in ['series', 'tv', 'show', 'shows'] or season is not None:
+    elif category in ['series', 'tv', 'show', 'shows', 'kdrama', 'k-drama'] or season is not None:
         endpoint = 'search/tv'
     else:
         endpoint = 'search/multi'
@@ -225,13 +272,13 @@ async def _search_media_id(query: str, api_key=None, category=None):
         if multi_results:
             break
 
-    target_words = set(re.findall(r'\w+', title.lower()))
+    target_words = set(re.findall(r'\w+', (title or raw_title).lower()))
 
     def get_title_score(res_title):
-        if not res_title or not title:
+        if not res_title or not (title or raw_title):
             return 0.0
         res_clean = res_title.lower().strip()
-        title_clean = title.lower().strip()
+        title_clean = (title or raw_title).lower().strip()
         if res_clean == title_clean:
             return 1.0
 
@@ -250,11 +297,13 @@ async def _search_media_id(query: str, api_key=None, category=None):
     for r in multi_results:
         res_title = r.get('title') or r.get('name')
         t_score = get_title_score(res_title)
-        if t_score >= 0.45 or (res_title and res_title.lower().strip() == title.lower().strip()):
+        if t_score >= 0.45 or (res_title and res_title.lower().strip() in [title.lower().strip() if title else '', raw_title.lower().strip() if raw_title else '']):
             scored_results.append((r, t_score))
 
     if not scored_results:
         return None, None
+
+    is_korean_query = any(k in query.lower() for k in ['korean', 'kdrama', 'k-drama']) or category in ['kdrama', 'k-drama']
 
     today = datetime.utcnow().date()
     candidates_past, candidates_upcoming = [], []
@@ -269,7 +318,7 @@ async def _search_media_id(query: str, api_key=None, category=None):
                 mtype = None
         if category in ['movie', 'movies'] and mtype != 'movie':
             continue
-        if category in ['series', 'tv', 'show', 'shows'] and mtype != 'tv':
+        if category in ['series', 'tv', 'show', 'shows', 'kdrama', 'k-drama'] and mtype != 'tv':
             continue
 
         rd_str = r.get('release_date') or r.get('first_air_date')
@@ -281,8 +330,9 @@ async def _search_media_id(query: str, api_key=None, category=None):
             continue
 
         year_bonus = 0.0
-        if year:
-            year_diff = abs(rd_date.year - year)
+        effective_year = year or raw_year
+        if effective_year:
+            year_diff = abs(rd_date.year - effective_year)
             if year_diff == 0:
                 year_bonus = 0.20
             elif year_diff == 1:
@@ -291,6 +341,10 @@ async def _search_media_id(query: str, api_key=None, category=None):
                 year_bonus = 0.05
             else:
                 year_bonus = -0.10
+
+        korean_bonus = 0.0
+        if is_korean_query and is_korean_media(r, mtype):
+            korean_bonus = 0.15
 
         if mtype == 'movie':
             try:
@@ -307,7 +361,7 @@ async def _search_media_id(query: str, api_key=None, category=None):
             'id':    r['id'],
             'date':  rd_date,
             'score': r.get('popularity', 0),
-            'ratio': ratio + year_bonus
+            'ratio': ratio + year_bonus + korean_bonus
         }
         (candidates_upcoming if rd_date > today else candidates_past).append(candidate)
 
