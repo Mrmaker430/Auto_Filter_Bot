@@ -1,3 +1,4 @@
+import re
 import datetime
 import logging
 import pytz  
@@ -39,24 +40,35 @@ class Database:
         if not title:
             return False
         clean_key = title.strip().lower()
-        await self.disabled_covers.update_one(
-            {"_id": clean_key},
-            {"$set": {"disabled": True, "title": title}},
-            upsert=True
-        )
+        sanitized_key = re.sub(r"[_\-\.#+$%^&*()!~`,;:\"'?/<>\[\]{}=|\\]", " ", title).strip().lower()
+        sanitized_key = re.sub(r"\s+", " ", sanitized_key)
+        keys = list({clean_key, sanitized_key})
+        for k in keys:
+            if k:
+                await self.disabled_covers.update_one(
+                    {"_id": k},
+                    {"$set": {"disabled": True, "title": title}},
+                    upsert=True
+                )
         return True
 
     async def is_cover_disabled(self, title: str) -> bool:
         if not title:
             return False
         clean_key = title.strip().lower()
+        sanitized_key = re.sub(r"[_\-\.#+$%^&*()!~`,;:\"'?/<>\[\]{}=|\\]", " ", title).strip().lower()
+        sanitized_key = re.sub(r"\s+", " ", sanitized_key)
+        keys = list({clean_key, sanitized_key})
         try:
-            doc = await self.disabled_covers.find_one({"_id": clean_key})
-            if doc and doc.get("disabled"):
-                return True
-            movie_doc = await self.movie_updates.find_one({"_id": clean_key})
-            if movie_doc and movie_doc.get("disabled"):
-                return True
+            for k in keys:
+                if not k:
+                    continue
+                doc = await self.disabled_covers.find_one({"_id": k})
+                if doc and doc.get("disabled"):
+                    return True
+                movie_doc = await self.movie_updates.find_one({"_id": k})
+                if movie_doc and movie_doc.get("disabled"):
+                    return True
         except Exception as e:
             logger.warning(f"is_cover_disabled error: {e}")
             return False
@@ -66,7 +78,12 @@ class Database:
         if not title:
             return False
         clean_key = title.strip().lower()
-        await self.disabled_covers.delete_one({"_id": clean_key})
+        sanitized_key = re.sub(r"[_\-\.#+$%^&*()!~`,;:\"'?/<>\[\]{}=|\\]", " ", title).strip().lower()
+        sanitized_key = re.sub(r"\s+", " ", sanitized_key)
+        keys = list({clean_key, sanitized_key})
+        for k in keys:
+            if k:
+                await self.disabled_covers.delete_one({"_id": k})
         return True
 
     async def add_name(self, filename):

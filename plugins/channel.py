@@ -31,9 +31,10 @@ IGNORE_WORDS = {
     "hdrip", "hin", "hindi", "tam", "tamil", "kan", "kannada", "tel", "telugu", 
     "mal", "malayalam", "eng", "english", "pun", "punjabi", "ben", "bengali", 
     "mar", "marathi", "guj", "gujarati", "urd", "urdu", "kor", "korean", "jpn", 
-    "japanese", "nf", "netflix", "sonyliv", "sony", "sliv", "amzn", "prime", 
+    "japanese", "south", "bollywood", "tollywood", "kollywood", "sandalwood",
+    "mollywood", "dallywood", "nf", "netflix", "sonyliv", "sony", "sliv", "amzn", "prime",
     "primevideo", "hotstar", "zee5", "jio", "jhs", "aha", "hbo", "paramount", 
-    "apple", "hoichoi", "sunnxt", "viki"
+    "apple", "hoichoi", "sunnxt", "viki", "chorki", "klikk", "addatimes"
 }|BAD_WORDS
 
 # Constants

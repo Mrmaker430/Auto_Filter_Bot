@@ -19,7 +19,7 @@ async def test_database_disabled_cover():
     # Test add_disabled_cover
     res_add = await db.add_disabled_cover("Test Movie")
     assert res_add is True
-    mock_disabled_col.update_one.assert_called_once()
+    assert mock_disabled_col.update_one.call_count >= 1
 
     # Test is_cover_disabled
     res_is = await db.is_cover_disabled("Test Movie")
@@ -28,6 +28,18 @@ async def test_database_disabled_cover():
     # Test remove_disabled_cover
     res_rem = await db.remove_disabled_cover("Test Movie")
     assert res_rem is True
+
+@pytest.mark.asyncio
+async def test_remove_cover_by_query_sanitization():
+    mock_res = MagicMock(modified_count=3)
+    mock_update = AsyncMock(return_value=mock_res)
+
+    with patch("motor.motor_asyncio.AsyncIOMotorCollection.update_many", mock_update):
+        res = await remove_cover_by_query("Avatar.2009.1080p.mkv")
+        assert res >= 3
+        mock_update.assert_called()
+        regex_arg = mock_update.call_args[0][0]["$or"][0]["file_name"]
+        assert regex_arg is not None
 
 @pytest.mark.asyncio
 async def test_clear_poster_cache():

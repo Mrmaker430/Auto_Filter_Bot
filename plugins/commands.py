@@ -1698,10 +1698,18 @@ async def remove_cover_cmd(client, message):
     # 2. Clear stored movie_updates poster data
     if hasattr(db, "movie_updates") and db.movie_updates is not None:
         try:
-            await db.movie_updates.update_many(
-                {"_id": {"$in": [target_name, clean_title, clean_title.strip().lower()]}},
-                {"$unset": {"poster_url": "", "backdrop_url": "", "primary_thumb": ""}, "$set": {"disabled": True}}
-            )
+            query_ids = [x for x in {target_name, clean_title, target_name.strip().lower(), clean_title.strip().lower()} if x and len(x.strip()) > 1]
+            if query_ids:
+                escaped_terms = [re.escape(x) for x in query_ids]
+                pattern_str = "|".join([r"(\b|[\.\+\-_])" + term + r"(\b|[\.\+\-_])" for term in escaped_terms])
+                await db.movie_updates.update_many(
+                    {"$or": [
+                        {"_id": {"$in": query_ids}},
+                        {"_id": {"$regex": pattern_str, "$options": "i"}},
+                        {"title": {"$regex": pattern_str, "$options": "i"}}
+                    ]},
+                    {"$unset": {"poster_url": "", "backdrop_url": "", "primary_thumb": ""}, "$set": {"disabled": True}}
+                )
         except Exception as e:
             logger.error(f"Error updating movie_updates in remove_cover: {e}")
 
@@ -1713,6 +1721,11 @@ async def remove_cover_cmd(client, message):
     # 4. Clear memory caches
     clear_poster_cache(target_name)
     clear_poster_cache(clean_title)
+    from plugins.Dreamxfutures.Imdbposter import TMDB_DETAILS_CACHE, IMDB_DETAILS_CACHE
+    for cache in (TMDB_DETAILS_CACHE, IMDB_DETAILS_CACHE):
+        to_del = [k for k in cache if target_name.lower() in k.lower() or clean_title.lower() in k.lower()]
+        for k in to_del:
+            cache.pop(k, None)
 
     await sts.edit(
         f"<b>✅ Covers successfully removed for '<code>{target_name}</code>'!</b>\n\n"

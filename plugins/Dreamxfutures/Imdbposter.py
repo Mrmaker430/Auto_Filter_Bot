@@ -63,8 +63,9 @@ _JUNK_TAGS = re.compile(
     r'x264|x265|h\.?264|h\.?265|HEVC|AVC|10bit|8bit|'
     r'AAC|AAC5\.1|AC3|EAC3|DDP?5\.1|DD5\.1|DTS|DTS[- ]?HD|TrueHD|FLAC|MP3|'
     r'ESubs|ESub|Subs|Subbed|Subtitle|Subtitles|Dubbed|Dual[ -]?Audio|Multi[ -]?Audio|'
-    r'Hindi|Korean|English|Tamil|Telugu|Malayalam|Kannada|Bengali|Marathi|Urdu|Japanese|Chinese|'
-    r'ORG|AMZN|NF|DSNP|HMAX|ATVP|iTunes|HULU|ZEE5|SonyLIV|Hotstar|'
+    r'Hindi|Korean|English|Tamil|Telugu|Malayalam|Kannada|Bengali|Marathi|Urdu|Gujarati|Punjabi|Japanese|Chinese|'
+    r'South|Bollywood|Tollywood|Kollywood|Sandalwood|Mollywood|Dallywood|'
+    r'ORG|AMZN|NF|DSNP|HMAX|ATVP|iTunes|HULU|ZEE5|SonyLIV|Hotstar|Hoichoi|SunNXT|Aha|Chorki|Klikk|Addatimes|PlanetBangla|'
     r'Remux|Proper|Repack|Extended|Unrated|Theatrical|'
     r'MKV|MP4|AVI|MOV|WEBM'
     r')\b',
@@ -195,6 +196,18 @@ def is_korean_media(item: dict, media_type: str = "tv") -> bool:
     return item.get("original_language") == "ko" or "KR" in item.get("origin_country", [])
 
 
+def is_indian_media(item: dict, media_type: str = "tv") -> bool:
+    """Check if TMDB item is Indian movie/series (Bollywood, South, Bengali, etc.)."""
+    if not item or not isinstance(item, dict):
+        return False
+    indian_langs = {'hi', 'ta', 'te', 'ml', 'kn', 'bn', 'mr', 'gu', 'pa', 'ur'}
+    orig_lang = item.get("original_language")
+    origin_country = item.get("origin_country", [])
+    if orig_lang in indian_langs or "IN" in origin_country:
+        return True
+    return False
+
+
 async def search_korean_media(query: str, media_type: str = "tv", limit: int = 10, api_key=None) -> list:
     """Search Korean dramas or movies on TMDB."""
     endpoint = 'search/tv' if media_type in ['tv', 'series', 'show', 'shows', 'kdrama', 'k-drama'] else 'search/movie'
@@ -229,7 +242,7 @@ async def _fetch_media_details(media_type: str, media_id: int, api_key=None):
     """Fetch full details for a movie or TV show from TMDB."""
     params = {
         'append_to_response': 'credits,external_ids,alternative_titles,release_dates,images',
-        'include_image_language': 'en,ko,null'
+        'include_image_language': 'en,hi,bn,ta,te,ml,kn,mr,ko,null'
     }
     return await _tmdb_get(f"{media_type}/{media_id}", params=params, api_key=api_key)
 
@@ -303,7 +316,12 @@ async def _search_media_id(query: str, api_key=None, category=None):
     if not scored_results:
         return None, None
 
-    is_korean_query = any(k in query.lower() for k in ['korean', 'kdrama', 'k-drama']) or category in ['kdrama', 'k-drama']
+    q_lower = query.lower()
+    is_korean_query = any(k in q_lower for k in ['korean', 'kdrama', 'k-drama']) or category in ['kdrama', 'k-drama']
+    is_indian_query = any(k in q_lower for k in [
+        'south', 'bollywood', 'bengali', 'hindi', 'tamil', 'telugu', 'malayalam',
+        'kannada', 'marathi', 'tollywood', 'kollywood', 'hoichoi', 'chorki', 'klikk', 'addatimes', 'sunnxt', 'aha'
+    ])
 
     today = datetime.utcnow().date()
     candidates_past, candidates_upcoming = [], []
@@ -322,16 +340,19 @@ async def _search_media_id(query: str, api_key=None, category=None):
             continue
 
         rd_str = r.get('release_date') or r.get('first_air_date')
-        if not (rd_str and mtype in ['movie', 'tv']):
-            continue
-        try:
-            rd_date = datetime.strptime(rd_str, '%Y-%m-%d').date()
-        except ValueError:
-            continue
+        rd_date = None
+        if rd_str:
+            try:
+                rd_date = datetime.strptime(rd_str, '%Y-%m-%d').date()
+            except ValueError:
+                rd_date = None
+        if not rd_date:
+            # Fallback to current date or year if date string missing
+            rd_date = today
 
         year_bonus = 0.0
         effective_year = year or raw_year
-        if effective_year:
+        if effective_year and rd_date:
             year_diff = abs(rd_date.year - effective_year)
             if year_diff == 0:
                 year_bonus = 0.20
@@ -346,6 +367,10 @@ async def _search_media_id(query: str, api_key=None, category=None):
         if is_korean_query and is_korean_media(r, mtype):
             korean_bonus = 0.15
 
+        indian_bonus = 0.0
+        if is_indian_media(r, mtype):
+            indian_bonus = 0.25 if is_indian_query else 0.15
+
         if mtype == 'movie':
             try:
                 details = await _fetch_media_details(mtype, r['id'], api_key=api_key)
@@ -354,14 +379,14 @@ async def _search_media_id(query: str, api_key=None, category=None):
                 if is_video or (runtime and runtime < MIN_RUNTIME):
                     continue
             except Exception:
-                continue
+                pass
 
         candidate = {
             'type':  mtype,
             'id':    r['id'],
             'date':  rd_date,
             'score': r.get('popularity', 0),
-            'ratio': ratio + year_bonus + korean_bonus
+            'ratio': ratio + year_bonus + korean_bonus + indian_bonus
         }
         (candidates_upcoming if rd_date > today else candidates_past).append(candidate)
 
@@ -674,8 +699,9 @@ async def get_movie_detailsx(query, id=False, file=None, category=None):
         posters = tmdb_data.get('images', {}).get('posters', {})
         original_language = tmdb_data.get('images', {}).get('original_language')
         poster_url = tmdb_data.get('poster_url')
+        preferred_langs = ('hi', 'bn', 'ta', 'te', 'ml', 'kn', 'mr', 'en', original_language, 'xx', 'no_lang', 'all')
         if not poster_url:
-            for key in ('en', original_language, 'xx'):
+            for key in preferred_langs:
                 if key and posters.get(key):
                     poster_url = posters[key][0]
                     break
@@ -683,7 +709,7 @@ async def get_movie_detailsx(query, id=False, file=None, category=None):
 
         backdrops = tmdb_data.get('images', {}).get('backdrops', {})
         backdrop_url = None
-        for key in ('en', original_language, 'xx', 'no_lang', 'all'):
+        for key in preferred_langs:
             if key and backdrops.get(key):
                 for b_img in backdrops[key]:
                     if b_img and b_img != poster_url:
@@ -699,7 +725,7 @@ async def get_movie_detailsx(query, id=False, file=None, category=None):
 
         logos = tmdb_data.get('images', {}).get('logos', {})
         logo_url = None
-        for key in ('en', original_language, 'xx', 'no_lang', 'all'):
+        for key in preferred_langs:
             if key and logos.get(key):
                 logo_url = logos[key][0]
                 break

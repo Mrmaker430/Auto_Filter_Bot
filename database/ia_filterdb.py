@@ -472,15 +472,30 @@ async def remove_cover_by_query(query: str) -> int:
     query = query.strip()
     if not query:
         return 0
-    if " " in query:
-        words = [re.escape(w) for w in query.split() if w]
-        raw_pattern = r".*[\s\.\+\-_]".join(words) if words else r"."
-    else:
-        raw_pattern = r"(\b|[\.\+\-_])" + re.escape(query) + r"(\b|[\.\+\-_])"
+
+    # Sanitize separators (e.g. dots, underscores, hyphens) to space or word gaps
+    clean_q = re.sub(r"[_\-\.#+$%^&*()!~`,;:\"'?/<>\[\]{}=|\\]", " ", query).strip()
+    clean_q = re.sub(r"\s+", " ", clean_q)
+
+    search_terms = list({query, clean_q})
+    patterns = []
+    for term in search_terms:
+        if not term:
+            continue
+        if " " in term:
+            words = [re.escape(w) for w in term.split() if w]
+            patterns.append(r".*[\s\.\+\-_]".join(words))
+        else:
+            patterns.append(r"(\b|[\.\+\-_])" + re.escape(term) + r"(\b|[\.\+\-_])")
+
+    if not patterns:
+        return 0
+
+    raw_pattern = "|".join(patterns)
     try:
         regex = compile_regex(raw_pattern)
     except re.error:
-        regex = re.compile(re.escape(query), re.IGNORECASE)
+        regex = re.compile(re.escape(clean_q or query), re.IGNORECASE)
 
     filter_mongo = {"$or": [{"file_name": regex}, {"caption": regex}]}
     update_op = {"$unset": {"cover": ""}}
