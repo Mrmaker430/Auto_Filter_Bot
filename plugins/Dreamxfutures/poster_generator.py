@@ -136,11 +136,18 @@ async def generate_movie_poster(movie_doc: Dict[str, Any]) -> io.BytesIO:
     # Determine image URLs
     backdrop_url = movie_doc.get("backdrop_url") or movie_doc.get("poster_url")
     poster_url = movie_doc.get("poster_url") or backdrop_url
+    logo_url = movie_doc.get("logo_url")
 
     # Fetch images in parallel
     backdrop_task = asyncio.create_task(fetch_image_bytes(backdrop_url, timeout=4))
     poster_task = asyncio.create_task(fetch_image_bytes(poster_url, timeout=4))
-    backdrop_bytes, poster_bytes = await asyncio.gather(backdrop_task, poster_task)
+    logo_task = asyncio.create_task(fetch_image_bytes(logo_url, timeout=4)) if logo_url else None
+
+    if logo_task:
+        backdrop_bytes, poster_bytes, logo_bytes = await asyncio.gather(backdrop_task, poster_task, logo_task)
+    else:
+        backdrop_bytes, poster_bytes = await asyncio.gather(backdrop_task, poster_task)
+        logo_bytes = None
 
     # Base Canvas 1920x1080
     W, H = 1920, 1080
@@ -167,16 +174,16 @@ async def generate_movie_poster(movie_doc: Dict[str, Any]) -> io.BytesIO:
         except Exception as e:
             logger.warning(f"Error processing backdrop image: {e}")
 
-    # Add dark gradient/overlay at bottom/left for text contrast
+    # Clearer backdrop overlay for text legibility without excessive dimming or blurring
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     overlay_draw = ImageDraw.Draw(overlay)
-    # Darken bottom area (from y=400 to 1080)
-    for y in range(350, H):
-        alpha = int(210 * ((y - 350) / (H - 350)))
+    # Soft gradient overlay on bottom area for plot/text readability
+    for y in range(500, H):
+        alpha = int(170 * ((y - 500) / (H - 500)))
         overlay_draw.line([(0, y), (W, y)], fill=(10, 10, 18, alpha))
-    # Darken left side slightly for poster
-    for x in range(0, 600):
-        alpha = int(120 * ((600 - x) / 600))
+    # Soft gradient on left side for poster separation
+    for x in range(0, 500):
+        alpha = int(90 * ((500 - x) / 500))
         overlay_draw.line([(x, 0), (x, H)], fill=(10, 10, 18, alpha))
 
     canvas = Image.alpha_composite(canvas.convert("RGBA"), overlay)
@@ -210,21 +217,39 @@ async def generate_movie_poster(movie_doc: Dict[str, Any]) -> io.BytesIO:
     content_x = poster_x + poster_w + 60
     content_y = poster_y + 10
 
-    # Title
-    title_text = str(movie_doc.get("_id") or "Movie Update").strip()
-    # Strip year from end if present
+    # Title or Title Logo
     year_val = str(movie_doc.get("year") or "").strip()
+    title_text = str(movie_doc.get("_id") or "Movie Update").strip()
     if year_val and title_text.endswith(year_val):
         title_text = title_text[:-len(year_val)].strip()
 
-    title_lines = wrap_text(title_text, font_title, max_width=W - content_x - 80, max_lines=2)
     current_y = content_y
-    for line in title_lines:
-        draw.text((content_x, current_y), line, font=font_title, fill=(255, 215, 0)) # Gold title
-        bbox = font_title.getbbox(line)
-        current_y += (bbox[3] - bbox[1]) + 15
+    logo_drawn = False
 
-    current_y += 15
+    if logo_bytes:
+        try:
+            logo_img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
+            max_logo_w = W - content_x - 100
+            max_logo_h = 160
+            scale = min(max_logo_w / logo_img.width, max_logo_h / logo_img.height, 1.0)
+            target_w = int(logo_img.width * scale)
+            target_h = int(logo_img.height * scale)
+            if target_w > 0 and target_h > 0:
+                logo_resized = logo_img.resize((target_w, target_h), Image.LANCZOS)
+                canvas.paste(logo_resized, (content_x, current_y), logo_resized)
+                current_y += target_h + 20
+                logo_drawn = True
+        except Exception as e:
+            logger.warning(f"Error processing title logo: {e}")
+
+    if not logo_drawn:
+        title_lines = wrap_text(title_text, font_title, max_width=W - content_x - 80, max_lines=2)
+        for line in title_lines:
+            draw.text((content_x, current_y), line, font=font_title, fill=(255, 215, 0)) # Gold title
+            bbox = font_title.getbbox(line)
+            current_y += (bbox[3] - bbox[1]) + 15
+
+    current_y += 10
 
     # Badges Row
     badge_x = content_x
