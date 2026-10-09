@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime
 from collections import defaultdict
 from plugins.Dreamxfutures.Imdbposter import get_movie_detailsx, fetch_image, get_movie_details
+from plugins.Dreamxfutures.poster_generator import generate_movie_poster
 from database.users_chats_db import db
 from pyrogram import Client, filters, enums
 from info import CHANNELS, MOVIE_UPDATE_CHANNEL, LINK_PREVIEW, ABOVE_PREVIEW, BAD_WORDS, LANDSCAPE_POSTER, TMDB_POSTER, GRP_LNK
@@ -371,16 +372,25 @@ async def send_movie_update(bot, base_name):
             buttons = InlineKeyboardMarkup([[
                 InlineKeyboardButton(
                     '🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎',
-                    url=GRP_LNK
+                    url=GRP_LNK,
+                    style=enums.ButtonStyle.PRIMARY
                 )
             ]])
-            size=(2560, 1440) if LANDSCAPE_POSTER and TMDB_POSTER and movie_doc.get("is_backdrop") and not movie_doc.get("error_tmdb") else (853, 1280)
-            if movie_doc.get("poster_url") and not LINK_PREVIEW:
-                resized_poster = await fetch_image(movie_doc["poster_url"], size)
-                if resized_poster:
+            if not LINK_PREVIEW:
+                try:
+                    generated_poster = await generate_movie_poster(movie_doc)
+                except Exception as e:
+                    logger.error(f"Error generating 1080p landscape poster: {e}")
+                    generated_poster = None
+
+                if not generated_poster and movie_doc.get("poster_url"):
+                    size = (2560, 1440) if LANDSCAPE_POSTER and TMDB_POSTER and movie_doc.get("is_backdrop") and not movie_doc.get("error_tmdb") else (853, 1280)
+                    generated_poster = await fetch_image(movie_doc["poster_url"], size)
+
+                if generated_poster:
                     msg = await bot.send_photo(
                         chat_id=MOVIE_UPDATE_CHANNEL,
-                        photo=resized_poster,
+                        photo=generated_poster,
                         caption=text,
                         reply_markup=buttons,
                         parse_mode=enums.ParseMode.HTML
@@ -432,7 +442,8 @@ async def update_movie_message(bot, base_name):
         buttons = InlineKeyboardMarkup([[
             InlineKeyboardButton(
                 '🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎',
-                url=GRP_LNK
+                url=GRP_LNK,
+                style=enums.ButtonStyle.PRIMARY
             )
         ]])
 

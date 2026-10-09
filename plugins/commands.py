@@ -467,6 +467,31 @@ async def start(client, message):
         if f_caption is None:
             f_caption = clean_filename(files.file_name)
         btn = await stream_buttons(message.from_user.id, file_id)
+
+        # Generate custom 1080p poster photo for requested file if available
+        custom_poster_msg = None
+        try:
+            movie_search_title = clean_filename(files.file_name)
+            movie_info = await db.get_movie_update(movie_search_title)
+            if not movie_info:
+                from utils import clean_search_text
+                c_title = clean_search_text(movie_search_title)
+                if c_title:
+                    movie_info = await db.get_movie_update(c_title)
+            if movie_info:
+                from plugins.Dreamxfutures.poster_generator import generate_movie_poster
+                poster_buf = await generate_movie_poster(movie_info)
+                poster_buf.name = "poster.jpg"
+                safe_title = movie_info.get('_id') or title or files.file_name
+                custom_poster_msg = await client.send_photo(
+                    chat_id=message.from_user.id,
+                    photo=poster_buf,
+                    caption=f"🎬 <b>{safe_title}</b>",
+                    protect_content=settings.get('file_secure', PROTECT_CONTENT)
+                )
+        except Exception as e:
+            logger.warning(f"Failed to send custom poster cover for start command: {e}")
+
         if files.file_type == 'video':
             msg = await client.send_video(
                 chat_id=message.from_user.id,
