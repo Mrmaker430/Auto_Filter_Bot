@@ -930,6 +930,46 @@ def get_readable_time(seconds):
             result.append(f'{int(period_value)}{period_name}')
     return ' '.join(result)  
 
+async def get_or_generate_cover(file_name: str, fallback_cover=None):
+    """
+    Attempts to fetch or generate a custom 1080p landscape poster image for a file
+    and save it locally to a temporary path to be used as video thumbnail (thumb).
+    Returns the path string if generated/saved successfully, else fallback_cover.
+    """
+    try:
+        clean_title = clean_filename(file_name)
+        movie_info = await db.get_movie_update(clean_title)
+        if not movie_info:
+            c_title = clean_search_text(clean_title)
+            if c_title:
+                movie_info = await db.get_movie_update(c_title)
+        if not movie_info:
+            details = await get_movie_detailsx(clean_title, file=file_name)
+            if details and not details.get("error"):
+                movie_info = {
+                    "_id": details.get("title") or clean_title,
+                    "year": details.get("year", ""),
+                    "rating": details.get("rating", "-"),
+                    "genres": details.get("genres", ""),
+                    "plot": details.get("plot") or details.get("overview", ""),
+                    "poster_url": details.get("poster_url"),
+                    "backdrop_url": details.get("backdrop_url")
+                }
+        if movie_info:
+            from plugins.Dreamxfutures.poster_generator import generate_movie_poster
+            poster_buf = await generate_movie_poster(movie_info)
+            if poster_buf:
+                temp_dir = "/tmp/covers"
+                os.makedirs(temp_dir, exist_ok=True)
+                sanitized_name = re.sub(r'[^a-zA-Z0-9]', '_', clean_title)[:30]
+                temp_path = os.path.join(temp_dir, f"cover_{sanitized_name}.jpg")
+                with open(temp_path, "wb") as f:
+                    f.write(poster_buf.getvalue())
+                return temp_path
+    except Exception as e:
+        logger.warning(f"Error in get_or_generate_cover for {file_name}: {e}")
+    return fallback_cover
+
 def generate_season_variations(search_raw: str, season_number: int):
     return [
         f"{search_raw} s{season_number:02}",
