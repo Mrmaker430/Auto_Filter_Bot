@@ -25,7 +25,7 @@ from info import (
     LOG_CHANNEL, SHORTENER_API, SHORTENER_API2, SHORTENER_API3, SHORTENER_WEBSITE, SHORTENER_WEBSITE2, SHORTENER_WEBSITE3,
     
 )
-from utils import get_settings, save_group_settings, is_subscribed, is_req_subscribed, get_size, get_shortlink, is_check_admin, temp, get_readable_time, get_time, generate_settings_text, log_error, clean_filename, get_random_mix_id
+from utils import get_settings, save_group_settings, is_subscribed, is_req_subscribed, get_size, get_shortlink, is_check_admin, temp, get_readable_time, get_time, generate_settings_text, log_error, clean_filename, get_random_mix_id, get_or_generate_cover
 
 logger = logging.getLogger(__name__)
 
@@ -367,14 +367,20 @@ async def start(client, message):
                         f_caption = f"{clean_filename(files1.file_name)}"
                     btn = await stream_buttons(message.from_user.id, file_id)
                     if files1.file_type == 'video':
+                        gen_cover = await get_or_generate_cover(files1.file_name, fallback_cover=cover)
                         msg = await client.send_video(
                             chat_id=message.from_user.id,
                             video=file_id,
                             caption=f_caption,
-                            thumb=cover,
+                            thumb=gen_cover,
                             protect_content=settings.get('file_secure', PROTECT_CONTENT),
                             reply_markup=InlineKeyboardMarkup(btn)
                         )
+                        if gen_cover and gen_cover != cover and os.path.exists(gen_cover):
+                            try:
+                                os.remove(gen_cover)
+                            except Exception:
+                                pass
                     else:
                         msg = await client.send_cached_media(
                             chat_id=message.from_user.id,
@@ -411,13 +417,19 @@ async def start(client, message):
                     is_video = details[0].file_type == 'video'
                 btn = await stream_buttons(message.from_user.id, file_id)
                 if is_video:
+                    gen_cover = await get_or_generate_cover(details[0].file_name, fallback_cover=cover) if details else cover
                     msg = await client.send_video(
                         chat_id=message.from_user.id,
                         video=file_id,
-                        thumb=cover,
+                        thumb=gen_cover,
                         protect_content=settings.get('file_secure', PROTECT_CONTENT),
                         reply_markup=InlineKeyboardMarkup(btn)
                     )
+                    if gen_cover and gen_cover != cover and os.path.exists(gen_cover):
+                        try:
+                            os.remove(gen_cover)
+                        except Exception:
+                            pass
                 else:
                     msg = await client.send_cached_media(
                         chat_id=message.from_user.id,
@@ -493,14 +505,20 @@ async def start(client, message):
             logger.warning(f"Failed to send custom poster cover for start command: {e}")
 
         if files.file_type == 'video':
+            gen_cover = await get_or_generate_cover(files.file_name, fallback_cover=cover)
             msg = await client.send_video(
                 chat_id=message.from_user.id,
                 video=file_id,
                 caption=f_caption,
-                thumb=cover,
+                thumb=gen_cover,
                 protect_content=settings.get('file_secure', PROTECT_CONTENT),
                 reply_markup=InlineKeyboardMarkup(btn)
             )
+            if gen_cover and gen_cover != cover and os.path.exists(gen_cover):
+                try:
+                    os.remove(gen_cover)
+                except Exception:
+                    pass
         else:
             msg = await client.send_cached_media(
                 chat_id=message.from_user.id,

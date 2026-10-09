@@ -11,6 +11,7 @@ from pyrogram.types import (
 )
 from pyrogram.errors import MessageNotModified, MessageTooLong
 from plugins.Dreamxfutures.Imdbposter import get_movie_detailsx
+from plugins.Dreamxfutures.poster_generator import generate_movie_poster
 from info import ADMINS, MOVIE_UPDATE_CHANNEL, ABOVE_PREVIEW
 from utils import temp
 
@@ -158,7 +159,7 @@ async def start_post_session(client: Client, message: Message, user_id: int, mov
 
     post_sessions[user_id] = {
         "movie_name": movie_name, "caption": None, "buttons": [],
-        "photo_mode": False,
+        "photo_mode": True if movie_details else False,
         "use_landscape": True if movie_details.get("backdrop_url") else False,
         "custom_languages": [], "custom_resolutions": [], "custom_otts": [],
         "last_preview_message_id": None, "original_message_id": message.id,
@@ -212,9 +213,27 @@ async def _build_final_post_content(session: dict, session_id: int):
         final_caption += f"\n\n{session['watermark']}"
 
     keyboard = build_keyboard(session, session_id)
-    poster_to_use = session.get("custom_poster") or \
-        (movie_details.get("backdrop_url") if session.get(
-            "use_landscape") else movie_details.get("poster_url"))
+    poster_to_use = session.get("custom_poster")
+    if not poster_to_use and movie_details:
+        movie_doc = {
+            "_id": movie_details.get("title") or session.get("movie_name"),
+            "year": movie_details.get("year", ""),
+            "rating": movie_details.get("rating", "-"),
+            "genres": movie_details.get("genres", ""),
+            "plot": movie_details.get("plot") or movie_details.get("overview", ""),
+            "poster_url": movie_details.get("poster_url"),
+            "backdrop_url": movie_details.get("backdrop_url"),
+            "logo_url": movie_details.get("logo_url")
+        }
+        try:
+            generated_buf = await generate_movie_poster(movie_doc)
+            if generated_buf:
+                generated_buf.seek(0)
+                generated_buf.name = "poster.jpg"
+                poster_to_use = generated_buf
+        except Exception as e:
+            logger.warning(f"Failed to generate custom poster in post handler: {e}")
+            poster_to_use = movie_details.get("backdrop_url") if session.get("use_landscape") else movie_details.get("poster_url")
 
     return final_caption, keyboard, poster_to_use
 
@@ -244,15 +263,27 @@ async def update_post_preview(client: Client, session_id: int, chat_id: int, for
         return await client.edit_message_text(chat_id, session["last_preview_message_id"], "Could not find details for this movie.")
 
     try:
-        if session["photo_mode"] and poster_to_use:
+        if (session["photo_mode"] or poster_to_use) and poster_to_use:
+            if hasattr(poster_to_use, "seek"):
+                poster_to_use.seek(0)
             if force_resend:
                 await client.delete_messages(chat_id, session["last_preview_message_id"])
                 sent_message = await client.send_photo(chat_id, photo=poster_to_use, caption=final_caption, reply_markup=keyboard, reply_to_message_id=session["original_message_id"])
                 session["last_preview_message_id"] = sent_message.id
             else:
-                await client.edit_message_caption(chat_id, session["last_preview_message_id"], caption=final_caption, reply_markup=keyboard)
+                try:
+                    await client.edit_message_caption(chat_id, session["last_preview_message_id"], caption=final_caption, reply_markup=keyboard)
+                except Exception:
+                    if hasattr(poster_to_use, "seek"):
+                        poster_to_use.seek(0)
+                    await client.delete_messages(chat_id, session["last_preview_message_id"])
+                    sent_message = await client.send_photo(chat_id, photo=poster_to_use, caption=final_caption, reply_markup=keyboard, reply_to_message_id=session["original_message_id"])
+                    session["last_preview_message_id"] = sent_message.id
         else:
-            text_content = f"<a href='{poster_to_use}'>&#8205;</a>{final_caption}" if poster_to_use else final_caption
+            if isinstance(poster_to_use, str) and poster_to_use.startswith("http"):
+                text_content = f"<a href='{poster_to_use}'>&#8205;</a>{final_caption}"
+            else:
+                text_content = final_caption
             await client.edit_message_text(chat_id, session["last_preview_message_id"], text_content, reply_markup=keyboard, link_preview_options=LinkPreviewOptions(is_disabled=False, show_above_text=ABOVE_PREVIEW))
     except MessageNotModified:
         pass
@@ -598,15 +629,20 @@ async def finalize_and_post(client: Client, query: CallbackQuery, session_id: in
             f"Failed to fetch movie details for '{session['movie_name']}' during finalization.")
         return await status_msg.edit("Could not fetch movie details to post. Aborting.")
 
-    mode = "Photo" if session["photo_mode"] and poster_to_use else "Text"
+    mode = "Photo" if (session["photo_mode"] or poster_to_use) and poster_to_use else "Text"
     try:
         if mode == "Photo":
+            if hasattr(poster_to_use, "seek"):
+                poster_to_use.seek(0)
             await client.send_photo(
                 chat_id=MOVIE_UPDATE_CHANNEL, photo=poster_to_use,
                 caption=final_caption, reply_markup=final_keyboard
             )
         else:
-            text_content = f"<a href='{poster_to_use}'>&#8205;</a>{final_caption}" if poster_to_use else final_caption
+            if isinstance(poster_to_use, str) and poster_to_use.startswith("http"):
+                text_content = f"<a href='{poster_to_use}'>&#8205;</a>{final_caption}"
+            else:
+                text_content = final_caption
             await client.send_message(
                 chat_id=MOVIE_UPDATE_CHANNEL, text=text_content,
                 reply_markup=final_keyboard, link_preview_options=LinkPreviewOptions(is_disabled=False, show_above_text=ABOVE_PREVIEW)
