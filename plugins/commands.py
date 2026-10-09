@@ -371,7 +371,7 @@ async def start(client, message):
                             chat_id=message.from_user.id,
                             video=file_id,
                             caption=f_caption,
-                            video_cover=cover,
+                            thumb=cover,
                             protect_content=settings.get('file_secure', PROTECT_CONTENT),
                             reply_markup=InlineKeyboardMarkup(btn)
                         )
@@ -414,7 +414,7 @@ async def start(client, message):
                     msg = await client.send_video(
                         chat_id=message.from_user.id,
                         video=file_id,
-                        video_cover=cover,
+                        thumb=cover,
                         protect_content=settings.get('file_secure', PROTECT_CONTENT),
                         reply_markup=InlineKeyboardMarkup(btn)
                     )
@@ -497,7 +497,7 @@ async def start(client, message):
                 chat_id=message.from_user.id,
                 video=file_id,
                 caption=f_caption,
-                video_cover=cover,
+                thumb=cover,
                 protect_content=settings.get('file_secure', PROTECT_CONTENT),
                 reply_markup=InlineKeyboardMarkup(btn)
             )

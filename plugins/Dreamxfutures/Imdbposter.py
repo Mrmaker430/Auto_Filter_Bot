@@ -201,18 +201,22 @@ async def _search_media_id(query: str, api_key=None):
 
 
 def _process_images(images_data):
-    """Organize poster and backdrop images by language."""
-    posters_by_lang, backdrops_by_lang = {}, {}
+    """Organize poster, backdrop, and logo images by language."""
+    posters_by_lang, backdrops_by_lang, logos_by_lang = {}, {}, {}
     for img in images_data.get('posters', []):
         lang = img.get('iso_639_1') or 'no_lang'
         posters_by_lang.setdefault(lang, []).append(f"{TMDB_IMAGE_BASE_URL}{img['file_path']}")
     for img in images_data.get('backdrops', []):
         lang = img.get('iso_639_1') or 'no_lang'
         backdrops_by_lang.setdefault(lang, []).append(f"{TMDB_IMAGE_BASE_URL}{img['file_path']}")
+    for img in images_data.get('logos', []):
+        lang = img.get('iso_639_1') or 'no_lang'
+        logos_by_lang.setdefault(lang, []).append(f"{TMDB_IMAGE_BASE_URL}{img['file_path']}")
     posters_by_lang['all'] = [f"{TMDB_IMAGE_BASE_URL}{i['file_path']}" for i in images_data.get('posters', [])]
     backdrops_by_lang['all'] = [f"{TMDB_IMAGE_BASE_URL}{i['file_path']}" for i in images_data.get('backdrops', [])]
-    languages = sorted(set(posters_by_lang) | set(backdrops_by_lang))
-    return {'posters': posters_by_lang, 'backdrops': backdrops_by_lang, 'available_languages': languages}
+    logos_by_lang['all'] = [f"{TMDB_IMAGE_BASE_URL}{i['file_path']}" for i in images_data.get('logos', [])]
+    languages = sorted(set(posters_by_lang) | set(backdrops_by_lang) | set(logos_by_lang))
+    return {'posters': posters_by_lang, 'backdrops': backdrops_by_lang, 'logos': logos_by_lang, 'available_languages': languages}
 
 
 async def _fetch_tmdb_data(query: str, api_key=None):
@@ -244,8 +248,17 @@ async def _fetch_tmdb_data(query: str, api_key=None):
     images_structured = _process_images(details.get('images', {}))
     images_structured['original_language'] = details.get('original_language')
 
+    logos = images_structured.get('logos', {})
+    orig_lang = details.get('original_language')
+    logo_url = None
+    for key in ('en', orig_lang, 'no_lang', 'all'):
+        if key and logos.get(key):
+            logo_url = logos[key][0]
+            break
+
     output_data = {
         'query': query, 'media_type': media_type, 'media_id': media_id,
+        'logo_url': logo_url,
         'title': details.get('title') or details.get('name'),
         'localized_title': details.get('original_title') or details.get('original_name'),
         'aka': _list_to_str_tmdb(details.get('alternative_titles', {}).get('titles', []), key='title'),
@@ -428,20 +441,22 @@ async def get_movie_detailsx(query, id=False, file=None):
     original_language = data.get('images', {}).get('original_language')
     poster_url = data.get('poster_url')
     if not poster_url:
-        for key in ('en', original_language, 'xx'):
+        for key in ('en', original_language, 'xx', 'all'):
             if key and posters.get(key):
                 poster_url = posters[key][0]
                 break
     details['poster_url'] = poster_url.replace("/original/", "/w1280/") if poster_url else None
 
     backdrops = data.get('images', {}).get('backdrops', {})
-    original_language = data.get('images', {}).get('original_language')
     backdrop_url = None
-    for key in ('en', original_language, 'xx', 'no_lang'):
+    for key in ('en', original_language, 'xx', 'no_lang', 'all'):
         if key and backdrops.get(key):
             backdrop_url = backdrops[key][0]
             break
     details['backdrop_url'] = backdrop_url.replace("/original/", "/w1280/") if backdrop_url else None
+
+    logo_url = data.get('logo_url')
+    details['logo_url'] = logo_url if logo_url else None
 
     return details
 
