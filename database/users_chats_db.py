@@ -37,6 +37,21 @@ class Database:
         await self.movie_updates.insert_one({'_id': filename})
         return True
 
+    async def get_movie_update(self, title):
+        if not title:
+            return None
+        title = str(title).strip()
+        doc = await self.movie_updates.find_one({'_id': title})
+        if doc:
+            return doc
+        import re
+        pattern = re.compile(f"^{re.escape(title)}$", re.IGNORECASE)
+        doc = await self.movie_updates.find_one({'_id': pattern})
+        if doc:
+            return doc
+        pattern_contains = re.compile(re.escape(title), re.IGNORECASE)
+        return await self.movie_updates.find_one({'_id': pattern_contains})
+
     async def delete_all_msg(self):
         await self.movie_updates.delete_many({})
         logger.info("All filenames notification have been deleted.")
