@@ -366,22 +366,45 @@ async def start(client, message):
                     if f_caption is None:
                         f_caption = f"{clean_filename(files1.file_name)}"
                     btn = await stream_buttons(message.from_user.id, file_id)
-                    if files1.file_type == 'video':
-                        gen_cover = await get_or_generate_cover(files1.file_name, fallback_cover=cover)
-                        msg = await client.send_video(
-                            chat_id=message.from_user.id,
-                            video=file_id,
-                            caption=f_caption,
-                            thumb=gen_cover,
-                            protect_content=settings.get('file_secure', PROTECT_CONTENT),
-                            reply_markup=InlineKeyboardMarkup(btn)
-                        )
-                        if gen_cover and gen_cover != cover and os.path.exists(gen_cover):
-                            try:
-                                os.remove(gen_cover)
-                            except Exception:
-                                pass
-                    else:
+                    gen_cover = await get_or_generate_cover(files1.file_name, fallback_cover=cover)
+                    try:
+                        if files1.file_type == 'video':
+                            msg = await client.send_video(
+                                chat_id=message.from_user.id,
+                                video=file_id,
+                                caption=f_caption,
+                                thumb=gen_cover,
+                                protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                                reply_markup=InlineKeyboardMarkup(btn)
+                            )
+                        elif files1.file_type == 'document':
+                            msg = await client.send_document(
+                                chat_id=message.from_user.id,
+                                document=file_id,
+                                caption=f_caption,
+                                thumb=gen_cover,
+                                protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                                reply_markup=InlineKeyboardMarkup(btn)
+                            )
+                        elif files1.file_type == 'audio':
+                            msg = await client.send_audio(
+                                chat_id=message.from_user.id,
+                                audio=file_id,
+                                caption=f_caption,
+                                thumb=gen_cover,
+                                protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                                reply_markup=InlineKeyboardMarkup(btn)
+                            )
+                        else:
+                            msg = await client.send_cached_media(
+                                chat_id=message.from_user.id,
+                                file_id=file_id,
+                                caption=f_caption,
+                                protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                                reply_markup=InlineKeyboardMarkup(btn)
+                            )
+                    except Exception as e:
+                        logger.warning(f"Failed sending typed media with cover, fallback to cached media: {e}")
                         msg = await client.send_cached_media(
                             chat_id=message.from_user.id,
                             file_id=file_id,
@@ -389,6 +412,12 @@ async def start(client, message):
                             protect_content=settings.get('file_secure', PROTECT_CONTENT),
                             reply_markup=InlineKeyboardMarkup(btn)
                         )
+                    finally:
+                        if gen_cover and gen_cover != cover and os.path.exists(gen_cover):
+                            try:
+                                os.remove(gen_cover)
+                            except Exception:
+                                pass
                     send_allfiles.append(msg)
                 k = await client.send_message(chat_id=message.from_user.id, text=script.DEL_MSG.format(get_time(DELETE_TIME)), parse_mode=enums.ParseMode.HTML)
 
@@ -416,27 +445,55 @@ async def start(client, message):
                         cover = details[0].cover if details[0].cover else None
                     is_video = details[0].file_type == 'video'
                 btn = await stream_buttons(message.from_user.id, file_id)
-                if is_video:
-                    gen_cover = await get_or_generate_cover(details[0].file_name, fallback_cover=cover) if details else cover
-                    msg = await client.send_video(
-                        chat_id=message.from_user.id,
-                        video=file_id,
-                        thumb=gen_cover,
-                        protect_content=settings.get('file_secure', PROTECT_CONTENT),
-                        reply_markup=InlineKeyboardMarkup(btn)
-                    )
-                    if gen_cover and gen_cover != cover and os.path.exists(gen_cover):
-                        try:
-                            os.remove(gen_cover)
-                        except Exception:
-                            pass
-                else:
+                file_type = details[0].file_type if details else ('video' if is_video else 'document')
+                file_name = details[0].file_name if details else ""
+                gen_cover = await get_or_generate_cover(file_name, fallback_cover=cover) if file_name else cover
+                try:
+                    if file_type == 'video':
+                        msg = await client.send_video(
+                            chat_id=message.from_user.id,
+                            video=file_id,
+                            thumb=gen_cover,
+                            protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                            reply_markup=InlineKeyboardMarkup(btn)
+                        )
+                    elif file_type == 'document':
+                        msg = await client.send_document(
+                            chat_id=message.from_user.id,
+                            document=file_id,
+                            thumb=gen_cover,
+                            protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                            reply_markup=InlineKeyboardMarkup(btn)
+                        )
+                    elif file_type == 'audio':
+                        msg = await client.send_audio(
+                            chat_id=message.from_user.id,
+                            audio=file_id,
+                            thumb=gen_cover,
+                            protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                            reply_markup=InlineKeyboardMarkup(btn)
+                        )
+                    else:
+                        msg = await client.send_cached_media(
+                            chat_id=message.from_user.id,
+                            file_id=file_id,
+                            protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                            reply_markup=InlineKeyboardMarkup(btn)
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed sending typed media with cover, fallback to cached media: {e}")
                     msg = await client.send_cached_media(
                         chat_id=message.from_user.id,
                         file_id=file_id,
                         protect_content=settings.get('file_secure', PROTECT_CONTENT),
                         reply_markup=InlineKeyboardMarkup(btn)
                     )
+                finally:
+                    if gen_cover and gen_cover != cover and os.path.exists(gen_cover):
+                        try:
+                            os.remove(gen_cover)
+                        except Exception:
+                            pass
 
                 filetype = msg.media
                 file = getattr(msg, filetype.value)
@@ -504,22 +561,45 @@ async def start(client, message):
         except Exception as e:
             logger.warning(f"Failed to send custom poster cover for start command: {e}")
 
-        if files.file_type == 'video':
-            gen_cover = await get_or_generate_cover(files.file_name, fallback_cover=cover)
-            msg = await client.send_video(
-                chat_id=message.from_user.id,
-                video=file_id,
-                caption=f_caption,
-                thumb=gen_cover,
-                protect_content=settings.get('file_secure', PROTECT_CONTENT),
-                reply_markup=InlineKeyboardMarkup(btn)
-            )
-            if gen_cover and gen_cover != cover and os.path.exists(gen_cover):
-                try:
-                    os.remove(gen_cover)
-                except Exception:
-                    pass
-        else:
+        gen_cover = await get_or_generate_cover(files.file_name, fallback_cover=cover)
+        try:
+            if files.file_type == 'video':
+                msg = await client.send_video(
+                    chat_id=message.from_user.id,
+                    video=file_id,
+                    caption=f_caption,
+                    thumb=gen_cover,
+                    protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                    reply_markup=InlineKeyboardMarkup(btn)
+                )
+            elif files.file_type == 'document':
+                msg = await client.send_document(
+                    chat_id=message.from_user.id,
+                    document=file_id,
+                    caption=f_caption,
+                    thumb=gen_cover,
+                    protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                    reply_markup=InlineKeyboardMarkup(btn)
+                )
+            elif files.file_type == 'audio':
+                msg = await client.send_audio(
+                    chat_id=message.from_user.id,
+                    audio=file_id,
+                    caption=f_caption,
+                    thumb=gen_cover,
+                    protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                    reply_markup=InlineKeyboardMarkup(btn)
+                )
+            else:
+                msg = await client.send_cached_media(
+                    chat_id=message.from_user.id,
+                    file_id=file_id,
+                    caption=f_caption,
+                    protect_content=settings.get('file_secure', PROTECT_CONTENT),
+                    reply_markup=InlineKeyboardMarkup(btn)
+                )
+        except Exception as e:
+            logger.warning(f"Failed sending typed media with cover, fallback to cached media: {e}")
             msg = await client.send_cached_media(
                 chat_id=message.from_user.id,
                 file_id=file_id,
@@ -527,6 +607,12 @@ async def start(client, message):
                 protect_content=settings.get('file_secure', PROTECT_CONTENT),
                 reply_markup=InlineKeyboardMarkup(btn)
             )
+        finally:
+            if gen_cover and gen_cover != cover and os.path.exists(gen_cover):
+                try:
+                    os.remove(gen_cover)
+                except Exception:
+                    pass
         
         k = await msg.reply(script.DEL_MSG.format(get_time(DELETE_TIME)), parse_mode=enums.ParseMode.HTML)
         await asyncio.sleep(DELETE_TIME)
