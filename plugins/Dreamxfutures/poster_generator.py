@@ -189,18 +189,19 @@ async def generate_movie_poster(movie_doc: Dict[str, Any]) -> io.BytesIO:
     canvas = Image.alpha_composite(canvas.convert("RGBA"), overlay)
 
     # Process Left Portrait Poster Inset
-    poster_w, poster_h = 360, 540
-    poster_x, poster_y = 80, (H - poster_h) // 2 + 50
+    poster_w, poster_h = 340, 500
+    poster_x, poster_y = 80, H - poster_h - 80
     if poster_bytes:
         try:
             p_img = Image.open(io.BytesIO(poster_bytes)).convert("RGBA")
             p_img = p_img.resize((poster_w, poster_h), Image.LANCZOS)
-            p_img = add_rounded_corners(p_img, radius=20)
+            p_img = add_rounded_corners(p_img, radius=24)
 
-            # White border around thumbnail
-            border_img = Image.new("RGBA", (poster_w + 8, poster_h + 8), (255, 255, 255, 220))
-            border_img = add_rounded_corners(border_img, radius=22)
-            canvas.paste(border_img, (poster_x - 4, poster_y - 4), border_img)
+            # Thick white border around thumbnail
+            border_w = 12
+            border_img = Image.new("RGBA", (poster_w + border_w, poster_h + border_w), (255, 255, 255, 240))
+            border_img = add_rounded_corners(border_img, radius=28)
+            canvas.paste(border_img, (poster_x - border_w // 2, poster_y - border_w // 2), border_img)
             canvas.paste(p_img, (poster_x, poster_y), p_img)
         except Exception as e:
             logger.warning(f"Error processing portrait poster: {e}")
@@ -208,14 +209,13 @@ async def generate_movie_poster(movie_doc: Dict[str, Any]) -> io.BytesIO:
     draw = ImageDraw.Draw(canvas)
 
     # Fonts
-    font_title = get_font(72, bold=True)
-    font_sub = get_font(32, bold=True)
+    font_title = get_font(84, bold=True)
     font_badge = get_font(28, bold=True)
-    font_plot = get_font(34, bold=False)
+    font_plot = get_font(36, bold=True)
 
     # Right Content Position
-    content_x = poster_x + poster_w + 60
-    content_y = poster_y + 10
+    content_x = poster_x + poster_w + 50
+    content_y = poster_y + 40
 
     # Title or Title Logo
     year_val = str(movie_doc.get("year") or "").strip()
