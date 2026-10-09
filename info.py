@@ -20,7 +20,7 @@ def is_enabled(value, default):
 # ============================
 # Bot Information Configuration
 # ============================
-SESSION = environ.get('SESSION', 'dreamxbotz_search')   # Session name for the bot
+SESSION = environ.get('SESSION', 'media_search')   # Session name for the bot
 API_ID = int(environ.get('API_ID', '')) # API ID from my.telegram.org
 API_HASH = environ.get('API_HASH', '')  # API Hash from my.telegram.org
 BOT_TOKEN = environ.get('BOT_TOKEN', "")    # Bot token from @BotFather
@@ -35,7 +35,7 @@ INDEX_CAPTION = is_enabled(environ.get('SAVE_CAPTION', "True"), True) # Save cap
 COVERX = is_enabled(environ.get('COVERX', "True"), True) # Use cover image for indexed files (default: True)
 # If you disable it then bot will use a default thumb for all files
 
-PICS_URL = (environ.get('PICS_URL', 'https://api.aniwallpaper.workers.dev/random?type=girl')).split() #random anime girl img each time from aniwallpaper (Experimental)
+PICS_URL = (environ.get('PICS', 'https://api.aniwallpaper.workers.dev/random?type=girl')).split() #random anime girl img each time from aniwallpaper (Experimental)
 PICS = (environ.get('PICS', 'https://graph.org/file/56b5deb73f3b132e2bb73.jpg https://graph.org/file/5303692652d91d52180c2.jpg https://graph.org/file/425b6f46efc7c6d64105f.jpg https://graph.org/file/876867e761c6c7a29855b.jpg')).split()  # Sample pic
 NOR_IMG = environ.get("NOR_IMG", "https://graph.org/file/e20b5fdaf217252964202.jpg")
 MELCOW_PHOTO = environ.get("MELCOW_PHOTO", "https://graph.org/file/56b5deb73f3b132e2bb73.jpg")
@@ -46,20 +46,21 @@ FSUB_PICS = (environ.get('FSUB_PICS', 'https://graph.org/file/7478ff3eac37f4329c
 # ============================
 # Admin, Channels & Users Configuration
 # ============================
-ADMINS = [int(admin) if id_pattern.search(admin) else admin for admin in environ.get('ADMINS', '634637418').split()] # Replace with the actual admin ID(s) to add
-CHANNELS = [int(ch) if id_pattern.search(ch) else ch for ch in environ.get('CHANNELS', '-100').split()]  # Channel id for auto indexing (make sure bot is admin)
+ADMINS = [int(admin) if id_pattern.search(admin) else admin for admin in environ.get('ADMINS', '1773034985').split()] # Replace with the actual admin ID(s) to add
+CHANNELS = [int(ch) if id_pattern.search(ch) else ch for ch in environ.get('CHANNELS', '-1002250750580 -1002640281126 -1002505289854 -1002453402856 -1002433218654 -1002357138941').split()]  # Channel id for auto indexing (make sure bot is admin)
 
-LOG_CHANNEL = int(environ.get('LOG_CHANNEL', '-100'))  # Log channel id (make sure bot is admin)
-BIN_CHANNEL = int(environ.get('BIN_CHANNEL', '-100'))  # Bin channel id (make sure bot is admin)
-PREMIUM_LOGS = int(environ.get('PREMIUM_LOGS', '-100'))  # Premium logs channel id
-DELETE_CHANNELS = [int(dch) if id_pattern.search(dch) else dch for dch in environ.get('DELETE_CHANNELS', '-100').split()] #(make sure bot is admin)
-support_chat_id = environ.get('SUPPORT_CHAT_ID', '-100')  # Support group id (make sure bot is admin)
-reqst_channel = environ.get('REQST_CHANNEL_ID', '-100')  # Request channel id (make sure bot is admin)
-SUPPORT_CHAT = environ.get('SUPPORT_CHAT', 'https://t.me/')  # Support group link (make sure bot is admin)
+LOG_CHANNEL = int(environ.get('LOG_CHANNEL', '-1002681646366'))  # Log channel id (make sure bot is admin)
+BIN_CHANNEL = int(environ.get('BIN_CHANNEL', '-1002681646366'))  # Bin channel id (make sure bot is admin)
+PREMIUM_LOGS = int(environ.get('PREMIUM_LOGS', '-1002681646366'))  # Premium logs channel id
+PINTEREST_LOG_CHANNEL = int(environ.get('PINTEREST_LOG_CHANNEL', '-1003914472745'))  # 2nd Log channel for Pinterest usage
+DELETE_CHANNELS = [int(dch) if id_pattern.search(dch) else dch for dch in environ.get('DELETE_CHANNELS', '-1002681646366').split()] #(make sure bot is admin)
+support_chat_id = environ.get('SUPPORT_CHAT_ID', '-1003717648037')  # Support group id (make sure bot is admin)
+reqst_channel = environ.get('REQST_CHANNEL_ID', '-1003717648037')  # Request channel id (make sure bot is admin)
+SUPPORT_CHAT = environ.get('SUPPORT_CHAT', 'https://t.me/cholochhitrosupport')  # Support group link (make sure bot is admin)
 
 # FORCE_SUB 
-auth_req_channels = environ.get("AUTH_REQ_CHANNELS", "-100")# requst to join Channel for force sub (make sure bot is admin) only for bot ADMINS  
-auth_channels     = environ.get("AUTH_CHANNELS", "-100")# Channels for force sub (make sure bot is admin)
+auth_req_channels = environ.get("AUTH_REQ_CHANNELS", "")# requst to join Channel for force sub (make sure bot is admin) only for bot ADMINS  
+auth_channels     = environ.get("AUTH_CHANNELS", "-1002097884361 -1003784139938")# Channels for force sub (make sure bot is admin)
 
 # ============================
 # Payment Configuration
@@ -80,7 +81,7 @@ STAR_PREMIUM_PLANS = {
 # ============================
 DATABASE_URI = environ.get('DATABASE_URI', "")  # MongoDB URI for the database
 DATABASE_NAME = environ.get('DATABASE_NAME', "Cluster0") # Database name (default: cluster)
-COLLECTION_NAME = environ.get('COLLECTION_NAME', 'dreamcinezone_files') # Collection name (default: dreamcinezone_files)
+COLLECTION_NAME = environ.get('COLLECTION_NAME', 'telegram_files') # Collection name (default: dreamcinezone_files)
 
 # If MULTIPLE_DB Is True Then Fill DATABASE_URI2 Value Else You Will Get Error.
 MULTIPLE_DB = is_enabled(os.environ.get('MULTIPLE_DB', "False"), False) # Type True For Turn On MULTIPLE DB FUNTION 
@@ -89,11 +90,11 @@ DATABASE_URI2 = environ.get('DATABASE_URI2', "")  # MongoDB URI for the second d
 # Movie Notification & Update Settings
 # ============================
 MOVIE_UPDATE_NOTIFICATION = is_enabled(environ.get('MOVIE_UPDATE_NOTIFICATION', "False"), False)  # Notification On (True) / Off (False)
-MOVIE_UPDATE_CHANNEL = int(environ.get('MOVIE_UPDATE_CHANNEL', '-100'))  # Notification of sent to your channel
+MOVIE_UPDATE_CHANNEL = int(environ.get('MOVIE_UPDATE_CHANNEL', '-1003784139938'))  # Notification of sent to your channel
 DREAMXBOTZ_IMAGE_FETCH = is_enabled(environ.get('DREAMXBOTZ_IMAGE_FETCH', "True"), True)  # On (True) / Off (False)
 LINK_PREVIEW = is_enabled(environ.get('LINK_PREVIEW', "False"), False) # Shows link preview in notification msg instead of image
 ABOVE_PREVIEW = is_enabled(environ.get('ABOVE_PREVIEW', "True"), True) # Shows link preview above the text in notification msg if True else below the msg
-TMDB_API_KEY = environ.get('TMDB_API_KEY', '') # preffer to use your own tmdb API Key get it from https://www.themoviedb.org/settings/api
+TMDB_API_KEY = environ.get('TMDB_API_KEY', '98f215cdc731a595c9d36dadca08a1aa') # preffer to use your own tmdb API Key get it from https://www.themoviedb.org/settings/api
 TMDB_POSTER = is_enabled(environ.get('TMDB_POSTER', "True"), True) # Shows TMDB poster in notification msg
 LANDSCAPE_POSTER = is_enabled(environ.get('LANDSCAPE_POSTER', "True"), True) # Shows landscape poster in notification msg
 
@@ -101,12 +102,12 @@ LANDSCAPE_POSTER = is_enabled(environ.get('LANDSCAPE_POSTER', "True"), True) # S
 # Verification Settings
 # ============================
 IS_VERIFY = is_enabled(environ.get('IS_VERIFY', 'False'), False)  # Verification On (True) / Off (False)
-LOG_VR_CHANNEL = int(environ.get('LOG_VR_CHANNEL', '-100')) #Verification Channel Id 
+LOG_VR_CHANNEL = int(environ.get('LOG_VR_CHANNEL', '-1002681646366')) #Verification Channel Id 
 VERIFY_IMG = environ.get("VERIFY_IMG", "https://telegra.ph/file/9ecc5d6e4df5b83424896.jpg")
 
-TUTORIAL = environ.get("TUTORIAL", "https://t.me/dreamxbotz")   # Tutorial link for verification
-TUTORIAL_2 = environ.get("TUTORIAL_2", "https://t.me/dreamxbotz")   # Second tutorial link for verification
-TUTORIAL_3 = environ.get("TUTORIAL_3", "https://t.me/dreamxbotz")   # Third tutorial link for verification
+TUTORIAL = environ.get("TUTORIAL", "https://t.me/")   # Tutorial link for verification
+TUTORIAL_2 = environ.get("TUTORIAL_2", "https://t.me/")   # Second tutorial link for verification
+TUTORIAL_3 = environ.get("TUTORIAL_3", "https://t.me/")   # Third tutorial link for verification
 
 # Verification (Must Fill All Veriables. Else You Got Error
 SHORTENER_API = environ.get("SHORTENER_API", "") # Shortener API key
@@ -124,9 +125,9 @@ THREE_VERIFY_GAP = int(environ.get('THREE_VERIFY_GAP', "54000"))
 # ============================
 # Channel & Group Links Configuration
 # ============================
-GRP_LNK = environ.get('GRP_LNK', 'https://t.me/dreamxbotz') # Group link for the bot
-OWNER_LNK = environ.get('OWNER_LNK', 'https://t.me/dreamxbotz') # Owner link for the bot
-UPDATE_CHNL_LNK = environ.get('UPDATE_CHNL_LNK', 'https://t.me/dreamxbotz') # Update channel link for the bot
+GRP_LNK = environ.get('GRP_LNK', 'https://t.me/cholochhitroo') # Group link for the bot
+OWNER_LNK = environ.get('OWNER_LNK', 'https://t.me/pArAd0X6') # Owner link for the bot
+UPDATE_CHNL_LNK = environ.get('UPDATE_CHNL_LNK', 'https://t.me/cholochhitropost') # Update channel link for the bot
 
 # ============================
 # User Configuration
@@ -138,11 +139,11 @@ PREMIUM_USER = [int(user) if id_pattern.search(user) else user for user in envir
 # ============================
 # Miscellaneous Configuration
 # ============================
-ULTRA_FAST_MODE = is_enabled(environ.get('ULTRA_FAST_MODE'), False) # Set to True for fast search, False for original search
+ULTRA_FAST_MODE = is_enabled(environ.get('ULTRA_FAST_MODE', "False"), True) # Set to True for fast search, False for original search
 
-MAX_B_TN = environ.get("MAX_B_TN", "5") # Maximum number of buttons in a row (default: 5)
-PORT = int(environ.get("PORT", "8080"))  # Port for the web server (default: 8080)
-MSG_ALRT = environ.get('MSG_ALRT', 'Share & Support Us ♥️') # Alert message for users
+MAX_B_TN = environ.get("MAX_B_TN", "10") # Maximum number of buttons in a row (default: 5)
+PORT = int(environ.get("PORT", "3000"))  # Port for the web server (default: 8080)
+MSG_ALRT = environ.get('MSG_ALRT', '𝖲𝗁𝖺𝗋𝖾 & 𝖲𝗎𝗉𝗉𝗈𝗋𝗍 𝖬𝖾 ♥️') # Alert message for users
 DELETE_TIME = int(environ.get("DELETE_TIME", "300"))  #  deletion time in seconds (default: 5 minutes). Adjust as per your needs.
 CUSTOM_FILE_CAPTION = environ.get("CUSTOM_FILE_CAPTION", f"{script.CAPTION}")   # Custom caption for files
 BATCH_FILE_CAPTION = environ.get("BATCH_FILE_CAPTION", CUSTOM_FILE_CAPTION) # Custom caption for batch files
@@ -165,6 +166,145 @@ EMOJI_MODE = is_enabled(environ.get('EMOJI_MODE', "True"), True)  # Emoji status
 BUTTON_MODE = is_enabled((environ.get('BUTTON_MODE', "False")), False) # pm & Group button or link mode (True) / Off (False)
 STREAM_MODE = is_enabled(environ.get('STREAM_MODE', "True"), True) # Set Stream mode True or False
 PREMIUM_STREAM_MODE = is_enabled(environ.get('PREMIUM_STREAM_MODE', "False"), False) # Set Stream mode True or False only for premium users
+MAINTENANCE = is_enabled(environ.get('MAINTENANCE', "False"), False)
+IS_FILE_LIMIT = is_enabled(environ.get('IS_FILE_LIMIT', "True"), True)
+FILES_LIMIT = int(environ.get('FILES_LIMIT', "8"))
+
+
+# ============================
+# Bot Configuration
+# ============================
+
+AUTH_REQ_CHANNELS = [int(ch) for ch in auth_req_channels.split() if ch and id_pattern.match(ch)] 
+AUTH_CHANNELS = [int(ch) for ch in auth_channels.split() if ch and id_pattern.match(ch)]
+REQST_CHANNEL = int(reqst_channel) if reqst_channel and id_pattern.search(reqst_channel) else None
+SUPPORT_CHAT_ID = int(support_chat_id) if support_chat_id and id_pattern.search(support_chat_id) else None
+LANGUAGES = {"ᴍᴀʟᴀʏᴀʟᴀᴍ":"mal","ᴛᴀᴍɪʟ":"tam","ᴇɴɢʟɪsʜ":"eng","ʜɪɴᴅɪ":"hin","ᴛᴇʟᴜɢᴜ":"tel","ᴋᴀɴɴᴀᴅᴀ":"kan","ɢᴜᴊᴀʀᴀᴛɪ":"guj","ᴍᴀʀᴀᴛʜɪ":"mar","ᴘᴜɴᴊᴀʙɪ":"pun"}
+QUALITIES = ["360P", "480P", "720P", "1080P", "1440P", "2160P", "4K"]
+
+SEASON_COUNT = 12
+SEASONS = [f"S{str(i).zfill(2)}" for i in range(1, SEASON_COUNT + 1)]
+
+BAD_WORDS = {
+    "PrivateMovieZ",
+    "toonworld4all",
+    "themoviesboss",
+    "1tamilmv",
+    "tamilblasters",
+    "1tamilblasters",
+    "skymovieshd",
+    "extraflix",
+    "hdm2",
+    "moviesmod",
+    "hdhub4u",
+    "mkvcinemas",
+    "primefix",
+    "join",
+    "www",
+    "villa",
+    "tg",
+    "original",
+    "MLSBD",
+    "1337xHd",
+    "pahe",
+    "primefix",
+    "yts",
+    "Filmy4wap",
+    "xyz"
+} # Set of bad words to filter out
+   
+
+# ============================
+# Server & Web Configuration
+# ============================
+
+ON_HEROKU = 'DYNO' in environ
+APP_NAME = environ.get('APP_NAME', None) if ON_HEROKU else None
+BIND_ADDRESS = getenv('WEB_SERVER_BIND_ADDRESS', '0.0.0.0')
+FQDN = (
+    environ.get('FQDN', BIND_ADDRESS)
+    if not ON_HEROKU or environ.get('FQDN')
+    else f"{APP_NAME}.herokuapp.com"
+)
+FQDN = re.sub(r'^https?://', '', str(FQDN)).rstrip('/')
+NO_PORT = is_enabled(environ.get('NO_PORT'), False)
+HAS_SSL = is_enabled(getenv('HAS_SSL'), True)
+
+if HAS_SSL:
+    URL = f"https://{FQDN}/"
+else:
+    URL = f"http://{FQDN}/" if NO_PORT else f"http://{FQDN}:{PORT}/"
+    
+SLEEP_THRESHOLD = int(environ.get('SLEEP_THRESHOLD', '60'))
+WORKERS = int(environ.get('WORKERS', '4'))
+SESSION_NAME = str(environ.get('SESSION_NAME', 'dreamXBotz'))
+MULTI_CLIENT = False
+name = str(environ.get('name', 'DREAMXBOTZ'))
+PING_INTERVAL = int(environ.get("PING_INTERVAL", "298"))  # 5 minutes
+# ============================
+REACTIONS = ["🤝", "😇", "🤗", "😍", "👍", "🎅", "😐", "🥰", "🤩", "😱", "🤣", "😘", "👏", "😛", "😈", "🎉", "⚡️", "🫡", "🤓", "😎", "🏆", "🔥", "🤭", "🌚", "🆒", "👻", "😁"]
+
+# ============================
+# Commands Bot
+# ============================
+Bot_cmds = {
+    "start": "Sᴛᴀʀᴛ Mᴇ Bᴀʙʏ",
+    "stats": "Gᴇᴛ Bᴏᴛ Sᴛᴀᴛs",
+    "alive": " Cʜᴇᴄᴋ Bᴏᴛ Aʟɪᴠᴇ ᴏʀ Nᴏᴛ ",
+    "settings": "ᴄʜᴀɴɢᴇ sᴇᴛᴛɪɴɢs",
+    "id": "ɢᴇᴛ ɪᴅ ᴛᴇʟᴇɢʀᴀᴍ ",
+    "info": "Gᴇᴛ Usᴇʀ ɪɴғᴏ ",
+    "del_msg": "ʀᴇᴍᴏᴠᴇ ғɪʟᴇ ɴᴀᴍᴇ ᴄᴏʟʟᴇᴄᴛɪᴏɴ ɴᴏтɪғɪᴄᴀᴛɪᴏɴ...",
+    "movie_update": "ᴏɴ ᴏғғ ᴀᴄᴄᴏʀᴅɪɴɢ ʏᴏᴜʀ ɴᴇᴇᴅᴇᴅ...",
+    "pm_search": "ᴘᴍ sᴇᴀʀᴄʜ ᴏɴ ᴏғғ ᴀᴄᴄᴏʀᴅɪɴɢ ʏᴏᴜʀ ɴᴇᴇᴅᴇᴅ...",
+    "trendlist": "Gᴇᴛ Tᴏᴘ Tʀᴀɴᴅɪɴɢ Sᴇᴀʀᴄʜ Lɪsᴛ",
+    "broadcast": "ʙʀᴏᴀᴅᴄᴀꜱᴛ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴀʟʟ ᴜꜱᴇʀꜱ.",
+    "grp_broadcast": "ʙʀᴏᴀᴅᴄᴀsᴛ ᴀ ᴍᴇssᴀɢᴇ ᴛᴏ ᴀʟʟ ᴄᴏɴɴᴇᴄᴛᴇᴅ ɢʀᴏᴜᴘs",
+    "send": "ꜱᴇɴᴅ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴀ ᴘᴀʀᴛɪᴄᴜʟᴀʀ ᴜꜱᴇʀ.",
+    "msg": "ꜱᴇɴᴅ ᴘᴇʀꜱᴏɴᴀʟ ᴍᴇꜱꜱᴀɢᴇ ᴛᴏ ᴀ ꜱᴘᴇᴄɪꜰɪᴄ ᴜꜱᴇʀ.",
+    "add_premium": "ᴀᴅᴅ ᴀɴʏ ᴜꜱᴇʀ ᴛᴏ ᴘʀᴇᴍɪᴜᴍ.",
+    "remove_premium": "ʀᴇᴍᴏᴠᴇ ᴀɴʏ ᴜꜱᴇʀ ꜰʀᴏᴍ ᴘʀᴇᴍɪᴜᴍ.",
+    "premium_users": "ɢᴇᴛ ʟɪꜱᴛ ᴏꜰ ᴘʀᴇᴍɪᴜᴍ ᴜꜱᴇʀꜱ.",
+    "restart": "ʀᴇꜱᴛᴀʀᴛ ᴛʜᴇ ʙᴏᴛ.",
+    "group_cmd": "ɢʀᴏᴜᴘ ᴄᴏᴍᴍᴀɴᴅ ʟɪsᴛ",
+    "admin_cmd": "ᴀᴅᴍɪɴ ᴄᴏᴍᴍᴀɴᴅs ʟɪsᴛ.",
+    "reset_group": "Group Setting Default",
+    "trial_reset": "User Trial Reset",
+    "remove_fsub": "Remove Forced Subscription (group admin only)",
+    "maintenance": "Maintenance Mode (Admin Only)",
+    "check_limit": "Cʜᴇᴄᴋ ᴀ ᴜsᴇʀ ʟɪᴍɪᴛ",
+    "reset_limit": "Rᴇsᴇᴛ ᴀ ᴜsᴇʀ's ʟɪᴍɪᴛ",
+    "remove_cover": "Rᴇᴍᴏᴠᴇ ᴄᴏᴠᴇʀ ᴀɴᴅ ᴅɪsᴀʙʟᴇ ᴀᴛᴛᴀᴄʜɪɴɢ",
+}
+
+
+#Don't Change Anything Here
+if not MULTIPLE_DB:
+    DATABASE_URI2 = DATABASE_URI
+
+# ============================
+# Logs Configuration
+# ============================
+LOG_STR = "Current Customized Configurations are:-\n"
+LOG_STR += ("IMDB Results are enabled, Bot will be showing imdb details for your queries.\n" if IMDB else "IMDB Results are disabled.\n")
+LOG_STR += ("P_TTI_SHOW_OFF found, Users will be redirected to send /start to Bot PM instead of sending file directly.\n" if P_TTI_SHOW_OFF else "P_TTI_SHOW_OFF is disabled, files will be sent in PM instead of starting the bot.\n")
+LOG_STR += ("BUTTON_MODE is found, filename and file size will be shown in a single button instead of two separate buttons.\n" if BUTTON_MODE else "BUTTON_MODE is disabled, filename and file size will be shown as different buttons.\n")
+LOG_STR += (f"CUSTOM_FILE_CAPTION enabled with value {CUSTOM_FILE_CAPTION}, your files will be sent along with this customized caption.\n" if CUSTOM_FILE_CAPTION else "No CUSTOM_FILE_CAPTION Found, Default captions of file will be used.\n")
+LOG_STR += ("Long IMDB storyline enabled." if LONG_IMDB_DESCRIPTION else "LONG_IMDB_DESCRIPTION is disabled, Plot will be shorter.\n")
+LOG_STR += ("Spell Check Mode is enabled, bot will be suggesting related movies if movie name is misspelled.\n" if SPELL_CHECK_REPLY else "Spell Check Mode is disabled.\n")
+et('IMDB', "True")), False)    # IMDB Results On (True) / Off (False)
+TMDB_ON_SEARCH = is_enabled((environ.get('TMDB_ON_SEARCH', "False")), False)    # Use TMDB Poster On Search Results
+AUTO_FFILTER = is_enabled((environ.get('AUTO_FFILTER', "True")), True) # Auto Filter On (True) / Off (False)
+AUTO_DELETE = is_enabled((environ.get('AUTO_DELETE', "True")), True) # Auto Delete On (True) / Off (False)
+LONG_IMDB_DESCRIPTION = is_enabled(environ.get("LONG_IMDB_DESCRIPTION", "False"), False) # Long IMDB Description On (True) / Off (False)
+SPELL_CHECK_REPLY = is_enabled(environ.get("SPELL_CHECK_REPLY", "True"), True) # Spell Check Mode On (True) / Off (False)
+MELCOW_NEW_USERS = is_enabled((environ.get('MELCOW_NEW_USERS', "False")), False) # Melcow New Users On (True) / Off (False)
+PROTECT_CONTENT = is_enabled((environ.get('PROTECT_CONTENT', "False")), False) # Protect Content On (True) / Off (False)
+PM_SEARCH = is_enabled(environ.get('PM_SEARCH', "True"), True)  # PM Search On (True) / Off (False)
+EMOJI_MODE = is_enabled(environ.get('EMOJI_MODE', "True"), True)  # Emoji status On (True) / Off (False)
+BUTTON_MODE = is_enabled((environ.get('BUTTON_MODE', "False")), False) # pm & Group button or link mode (True) / Off (False)
+STREAM_MODE = is_enabled(environ.get('STREAM_MODE', "True"), True) # Set Stream mode True or False
+PREMIUM_STREAM_MODE = is_enabled(environ.get('PREMIUM_STREAM_MODE', "True"), True) # Set Stream mode True or False only for premium users
 MAINTENANCE = is_enabled(environ.get('MAINTENANCE', "False"), False)
 
 
