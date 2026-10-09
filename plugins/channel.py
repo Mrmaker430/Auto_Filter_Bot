@@ -6,7 +6,7 @@ from collections import defaultdict
 from plugins.Dreamxfutures.Imdbposter import get_movie_detailsx, fetch_image, get_movie_details
 from database.users_chats_db import db
 from pyrogram import Client, filters, enums
-from info import CHANNELS, MOVIE_UPDATE_CHANNEL, LINK_PREVIEW, ABOVE_PREVIEW, BAD_WORDS, LANDSCAPE_POSTER, TMDB_POSTER
+from info import CHANNELS, MOVIE_UPDATE_CHANNEL, LINK_PREVIEW, ABOVE_PREVIEW, BAD_WORDS, LANDSCAPE_POSTER, TMDB_POSTER, GRP_LNK
 from Script import script
 from database.ia_filterdb import save_file
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LinkPreviewOptions
@@ -370,8 +370,8 @@ async def send_movie_update(bot, base_name):
             text = generate_movie_message(movie_doc, base_name)
             buttons = InlineKeyboardMarkup([[
                 InlineKeyboardButton(
-                    'ɢᴇᴛ ғɪʟᴇs',
-                    url=f"https://t.me/{temp.U_NAME}?start=getfile-{base_name.replace(' ', '-')}"
+                    '🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎',
+                    url=GRP_LNK
                 )
             ]])
             size=(2560, 1440) if LANDSCAPE_POSTER and TMDB_POSTER and movie_doc.get("is_backdrop") and not movie_doc.get("error_tmdb") else (853, 1280)
@@ -431,8 +431,8 @@ async def update_movie_message(bot, base_name):
         text = generate_movie_message(movie_doc, base_name)
         buttons = InlineKeyboardMarkup([[
             InlineKeyboardButton(
-                'ɢᴇᴛ ғɪʟᴇs',
-                url=f"https://t.me/{temp.U_NAME}?start=getfile-{base_name.replace(' ', '-')}"
+                '🔍 ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ 🔎',
+                url=GRP_LNK
             )
         ]])
 
@@ -559,17 +559,21 @@ def generate_movie_message(movie_doc, base_name):
     filename_display = base_name
     if year_val and filename_display.strip().endswith(year_val):
         filename_display = filename_display.strip()[:-len(year_val)].strip()
+    imdb_url = movie_doc.get("imdb_url") or "https://www.imdb.com"
+    poster_url = movie_doc.get("poster_url") or "https://graph.org/file/56b5deb73f3b132e2bb73.jpg"
+    search_link = GRP_LNK or temp.B_LINK or "https://t.me/"
+
     return script.MOVIE_UPDATE_NOTIFY_TXT.format(
-        poster_url=movie_doc.get("poster_url", ""),
-        imdb_url=movie_doc.get("imdb_url", ""),
+        poster_url=poster_url,
+        imdb_url=imdb_url,
         filename=filename_display,
         tag=primary_tag,
-        year=year_val,
+        year=year_val or "N/A",
         genres=genres,
         ott=ott_str,
         quality=quality_str,
         language=language_str,
         episodes=epi_block,
         rating=rating_text,
-        search_link=temp.B_LINK
-)
+        search_link=search_link
+    )
