@@ -258,9 +258,6 @@ Nᴀᴍᴇ - {}
 
 ‼️ <b>ᴍᴜꜱᴛ ꜱᴇɴᴅ ꜱᴄʀᴇᴇɴꜱʜᴏᴛ ᴀꜰᴛᴇʀ ᴅᴏɴᴀᴛɪɴɢ.</b>"""
 
-
-
-
     NORSLTS = """ 
 #NoResults
 
@@ -288,8 +285,7 @@ Mᴇꜱꜱᴀɢᴇ : <b>{}</b>"""
 ⏩ <b>Qᴜᴀʟɪᴛʏ : {quality}</b>
 ☀️ <b>Aᴜᴅɪᴏ : {language}</b>
 <b>{episodes}</b>
-
-🔍 <b><a href="{search_link}">[ ꜱᴇᴀʀᴄʜ ʜᴇʀᴇ ]</a></b>"""
+"""
 
 
     IMDB_TEMPLATE_TXT = """<b><a href={url}>{title} (<a href={url}/releaseinfo>{year}</a>)
