@@ -13,7 +13,7 @@ from monkey_patch import (
     _cache_key,
     _cache_put,
     _cache_get,
-    _patch_save_file,
+    _patch_client_media_send,
     _patch_media_client,
 )
 
@@ -40,6 +40,11 @@ class TestMonkeyPatch(unittest.IsolatedAsyncioTestCase):
         title, year = _extract_title(media)
         self.assertEqual(title, "Stranger Things")
         self.assertIsNone(year)
+
+    async def test_extract_title_string(self):
+        title, year = _extract_title("Interstellar.2014.1080p.mkv")
+        self.assertEqual(title, "Interstellar")
+        self.assertEqual(year, 2014)
 
     async def test_already_has_thumb(self):
         media_with_thumb = MagicMock()
@@ -84,42 +89,74 @@ class TestMonkeyPatch(unittest.IsolatedAsyncioTestCase):
             key_file.unlink()
 
     async def test_patches_applied(self):
-        from database import ia_filterdb
         from pyrogram import Client
 
-        self.assertTrue(getattr(ia_filterdb.save_file, "_cover_patched", False))
         self.assertTrue(getattr(Client.__init__, "_cover_patched", False))
+        self.assertTrue(getattr(Client.send_video, "_cover_patched", False))
+        self.assertTrue(getattr(Client.send_document, "_cover_patched", False))
+        self.assertTrue(getattr(Client.send_audio, "_cover_patched", False))
+        self.assertTrue(getattr(Client.send_cached_media, "_cover_patched", False))
 
     @patch("monkey_patch._fetch_poster", new_callable=AsyncMock)
-    @patch("monkey_patch._reupload_with_cover", new_callable=AsyncMock)
-    async def test_patched_save_file_attaches_cover(self, mock_reupload, mock_fetch):
-        from database import ia_filterdb
+    async def test_patched_send_video_attaches_cover(self, mock_fetch):
+        from pyrogram import Client
 
-        mock_fetch.return_value = b"poster_bytes_data"
-        mock_reupload.return_value = "new_file_id_123"
+        img = Image.new("RGB", (100, 100), color="red")
+        img_buf = io.BytesIO()
+        img.save(img_buf, format="JPEG")
+        mock_fetch.return_value = img_buf.getvalue()
 
-        media = MagicMock()
-        media.file_id = "test_file_id"
-        media.caption = "Test Movie 2023 1080p.mkv"
-        media.document = MagicMock()
-        media.document.thumbs = None
-        media.document.file_id = "old_file_id_000"
-        media.video = None
-        media.audio = None
-        media._client = MagicMock()
+        dummy_orig = AsyncMock()
+        with patch.object(Client, "send_video", dummy_orig):
+            if hasattr(dummy_orig, "_cover_patched"):
+                delattr(dummy_orig, "_cover_patched")
+            _patch_client_media_send()
 
-        with patch("database.ia_filterdb.unpack_new_file_id", return_value=("fid", "fref")), \
-             patch("database.ia_filterdb.Media.find_one", new_callable=AsyncMock) as mock_find_one, \
-             patch("database.ia_filterdb.Media.commit", new_callable=AsyncMock) as mock_commit:
-            mock_find_one.return_value = None
-
-            with patch.object(monkey_patch, "COVER_ENABLED", True), \
-                 patch.object(monkey_patch, "DB_CHANNEL_ID", -100123456789):
-                res, code = await ia_filterdb.save_file(media)
+            client = MagicMock(spec=Client)
+            with patch.object(monkey_patch, "COVER_ENABLED", True):
+                await Client.send_video(client, 12345, "Inception.2010.1080p.mkv")
 
         mock_fetch.assert_called_once()
-        mock_reupload.assert_called_once()
-        self.assertEqual(media.document.file_id, "new_file_id_123")
+        dummy_orig.assert_called_once()
+        _, kwargs = dummy_orig.call_args
+        self.assertIn("thumb", kwargs)
+        self.assertIsNotNone(kwargs["thumb"])
+
+    @patch("monkey_patch._fetch_poster", new_callable=AsyncMock)
+    @patch("database.ia_filterdb.get_file_details", new_callable=AsyncMock)
+    async def test_patched_send_cached_media_attaches_cover(self, mock_get_file_details, mock_fetch):
+        from pyrogram import Client
+
+        img = Image.new("RGB", (100, 100), color="red")
+        img_buf = io.BytesIO()
+        img.save(img_buf, format="JPEG")
+        mock_fetch.return_value = img_buf.getvalue()
+
+        file_doc = MagicMock()
+        file_doc.file_name = "Avatar.2009.1080p.mkv"
+        file_doc.file_type = "video"
+        file_doc.caption = "Avatar (2009)"
+        mock_get_file_details.return_value = [file_doc]
+
+        dummy_send_video = AsyncMock()
+        dummy_send_cached_media = AsyncMock()
+
+        with patch.object(Client, "send_video", dummy_send_video), \
+             patch.object(Client, "send_cached_media", dummy_send_cached_media):
+            if hasattr(dummy_send_video, "_cover_patched"):
+                delattr(dummy_send_video, "_cover_patched")
+            _patch_client_media_send()
+
+            client = MagicMock(spec=Client)
+            with patch.object(monkey_patch, "COVER_ENABLED", True):
+                await Client.send_cached_media(client, 12345, "cached_file_id_999")
+
+        mock_get_file_details.assert_called_once_with("cached_file_id_999")
+        mock_fetch.assert_called_once()
+        dummy_send_video.assert_called_once()
+        _, kwargs = dummy_send_video.call_args
+        self.assertIn("thumb", kwargs)
+        self.assertIsNotNone(kwargs["thumb"])
 
 if __name__ == "__main__":
     unittest.main()
