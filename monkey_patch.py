@@ -3,13 +3,13 @@
 Fast cover attach — monkey patch for AutoFilter bot.
 
 No AI. Just TMDB posters, disk-cached, concurrent, skip-if-present.
+Attaches covers when users get files through the bot.
 
 Import FIRST in bot.py:
     import monkey_patch  # noqa: F401
 
 Env:
     COVER_ATTACH_ENABLED=true|false   (default: true)
-    DB_CHANNEL_ID=-100123...          (required)
     TMDB_API_KEY or TMDB_BEARER_TOKEN (required)
     COVER_CACHE_DIR=./poster_cache    (default)
 """
@@ -34,14 +34,11 @@ log = logging.getLogger(__name__)
 # ==================================================================
 try:
     import info
-    _DEFAULT_DB_CHANNEL = getattr(info, "BIN_CHANNEL", 0) or getattr(info, "LOG_CHANNEL", 0)
     _DEFAULT_TMDB_KEY = getattr(info, "TMDB_API_KEY", "")
 except Exception:
-    _DEFAULT_DB_CHANNEL = 0
     _DEFAULT_TMDB_KEY = ""
 
 COVER_ENABLED   = os.getenv("COVER_ATTACH_ENABLED", "true").lower() == "true"
-DB_CHANNEL_ID   = int(os.getenv("DB_CHANNEL_ID") or _DEFAULT_DB_CHANNEL or "0")
 TMDB_API_KEY    = os.getenv("TMDB_API_KEY") or _DEFAULT_TMDB_KEY
 TMDB_BEARER     = os.getenv("TMDB_BEARER_TOKEN", "")
 CACHE_DIR       = Path(os.getenv("COVER_CACHE_DIR", "./poster_cache"))
@@ -50,7 +47,6 @@ THUMB_MAX_BYTES = 200 * 1024
 THUMB_MAX_DIM   = 320
 HTTP_TIMEOUT    = 10
 TMDB_SEM        = asyncio.Semaphore(8)   # cap concurrent TMDB calls
-UPLOAD_SEM      = asyncio.Semaphore(4)   # cap concurrent reuploads
 
 _PATCHED = False
 _RUNNING_CLIENT = None
@@ -92,16 +88,19 @@ _EXT = re.compile(r'\.(mkv|mp4|avi|mov|webm|flv|wmv|ts|m2ts|m4v|mp3|m4a)$', re.I
 _SXXEXX = re.compile(r'[Ss](\d{1,2})[\s\.\-_]*[Ee](\d{1,3})')
 
 
-def _extract_title(media) -> Tuple[str, Optional[int]]:
+def _extract_title(media_or_text) -> Tuple[str, Optional[int]]:
     raw = ""
-    if getattr(media, "caption", None):
-        raw = media.caption
-    elif getattr(media, "document", None) and getattr(media.document, "file_name", None):
-        raw = media.document.file_name
-    elif getattr(media, "video", None) and getattr(media.video, "file_name", None):
-        raw = media.video.file_name
-    elif getattr(media, "audio", None):
-        raw = getattr(media.audio, "title", None) or getattr(media.audio, "file_name", None) or ""
+    if isinstance(media_or_text, str):
+        raw = media_or_text
+    elif media_or_text is not None:
+        if getattr(media_or_text, "caption", None):
+            raw = media_or_text.caption
+        elif getattr(media_or_text, "document", None) and getattr(media_or_text.document, "file_name", None):
+            raw = media_or_text.document.file_name
+        elif getattr(media_or_text, "video", None) and getattr(media_or_text.video, "file_name", None):
+            raw = media_or_text.video.file_name
+        elif getattr(media_or_text, "audio", None):
+            raw = getattr(media_or_text.audio, "title", None) or getattr(media_or_text.audio, "file_name", None) or ""
 
     raw = _EXT.sub('', raw)
     raw = _SXXEXX.sub(' ', raw)
@@ -202,53 +201,6 @@ async def _fetch_poster(title: str, year: Optional[int]) -> Optional[bytes]:
 
 
 # ==================================================================
-# RE-UPLOAD WITH COVER
-# ==================================================================
-async def _reupload_with_cover(client, media, poster_bytes: bytes) -> Optional[str]:
-    thumb = _prepare_thumb(poster_bytes)
-    if not thumb:
-        return None
-
-    buf = io.BytesIO()
-    await client.download_media(media, file_name=buf)
-    buf.seek(0)
-    caption = media.caption or ""
-
-    async with UPLOAD_SEM:
-        try:
-            if media.document:
-                msg = await client.send_document(
-                    chat_id=DB_CHANNEL_ID, document=buf, thumb=thumb,
-                    caption=caption,
-                    file_name=getattr(media.document, "file_name", None) or "file.bin",
-                )
-                return msg.document.file_id
-
-            if media.video:
-                msg = await client.send_video(
-                    chat_id=DB_CHANNEL_ID, video=buf, thumb=thumb,
-                    caption=caption,
-                    duration=getattr(media.video, "duration", 0) or 0,
-                    width=getattr(media.video, "width", 0) or 0,
-                    height=getattr(media.video, "height", 0) or 0,
-                    file_name=getattr(media.video, "file_name", None) or "video.mp4",
-                )
-                return msg.video.file_id
-
-            if media.audio:
-                msg = await client.send_audio(
-                    chat_id=DB_CHANNEL_ID, audio=buf, thumb=thumb,
-                    caption=caption,
-                    file_name=getattr(media.audio, "file_name", None) or "audio.mp3",
-                )
-                return msg.audio.file_id
-        except Exception as e:
-            log.warning("Reupload with cover failed: %s", e)
-
-    return None
-
-
-# ==================================================================
 # HAS-THUMB GUARD — skip work if file already carries a cover
 # ==================================================================
 def _already_has_thumb(media) -> bool:
@@ -260,56 +212,99 @@ def _already_has_thumb(media) -> bool:
 
 
 # ==================================================================
-# PATCH ia_filterdb.save_file
+# HELPER TO GET POSTER THUMB FOR MEDIA / FILENAME
 # ==================================================================
-def _patch_save_file() -> bool:
+async def _get_poster_thumb(name_or_caption: str, year: Optional[int] = None) -> Optional[io.BytesIO]:
+    if not name_or_caption:
+        return None
+    title, extracted_year = _extract_title(name_or_caption)
+    poster_bytes = await _fetch_poster(title, year or extracted_year)
+    if poster_bytes:
+        return _prepare_thumb(poster_bytes)
+    return None
+
+
+# ==================================================================
+# PATCH Pyrogram Client send_video, send_document, send_audio, send_cached_media
+# ==================================================================
+def _patch_client_media_send():
     try:
-        from database import ia_filterdb
-    except ImportError as e:
-        log.error("ia_filterdb import failed: %s", e)
+        from pyrogram import Client
+    except ImportError:
         return False
 
-    original = getattr(ia_filterdb, "save_file", None)
-    if original is None:
-        log.error("save_file not found")
-        return False
+    orig_send_video = getattr(Client, "send_video", None)
+    orig_send_document = getattr(Client, "send_document", None)
+    orig_send_audio = getattr(Client, "send_audio", None)
+    orig_send_cached_media = getattr(Client, "send_cached_media", None)
 
-    if getattr(original, "_cover_patched", False):
+    if orig_send_video and getattr(orig_send_video, "_cover_patched", False):
         return True
 
-    @wraps(original)
-    async def patched_save_file(media, *args, **kwargs):
-        if not COVER_ENABLED or not DB_CHANNEL_ID:
-            return await original(media, *args, **kwargs)
+    @wraps(orig_send_video)
+    async def patched_send_video(self, chat_id, video, *args, **kwargs):
+        if COVER_ENABLED and kwargs.get("thumb") is None:
+            caption = kwargs.get("caption") or ""
+            file_name = kwargs.get("file_name") or (video if isinstance(video, str) else None)
+            thumb = await _get_poster_thumb(file_name or caption)
+            if thumb:
+                kwargs["thumb"] = thumb
+        return await orig_send_video(self, chat_id, video, *args, **kwargs)
 
-        # Fast skip — file already has a thumbnail
-        if _already_has_thumb(media):
-            return await original(media, *args, **kwargs)
+    @wraps(orig_send_document)
+    async def patched_send_document(self, chat_id, document, *args, **kwargs):
+        if COVER_ENABLED and kwargs.get("thumb") is None:
+            caption = kwargs.get("caption") or ""
+            file_name = kwargs.get("file_name") or (document if isinstance(document, str) else None)
+            thumb = await _get_poster_thumb(file_name or caption)
+            if thumb:
+                kwargs["thumb"] = thumb
+        return await orig_send_document(self, chat_id, document, *args, **kwargs)
 
-        client = getattr(media, "_client", None) or _RUNNING_CLIENT
-        if client is None:
-            return await original(media, *args, **kwargs)
+    @wraps(orig_send_audio)
+    async def patched_send_audio(self, chat_id, audio, *args, **kwargs):
+        if COVER_ENABLED and kwargs.get("thumb") is None:
+            caption = kwargs.get("caption") or ""
+            file_name = kwargs.get("file_name") or (audio if isinstance(audio, str) else None)
+            thumb = await _get_poster_thumb(file_name or caption)
+            if thumb:
+                kwargs["thumb"] = thumb
+        return await orig_send_audio(self, chat_id, audio, *args, **kwargs)
 
-        try:
-            title, year = _extract_title(media)
-            if title:
-                poster = await _fetch_poster(title, year)
-                if poster:
-                    new_id = await _reupload_with_cover(client, media, poster)
-                    if new_id:
-                        for kind in ("document", "video", "audio"):
-                            obj = getattr(media, kind, None)
-                            if obj:
-                                obj.file_id = new_id
-                                break
-        except Exception as e:
-            log.exception("Cover attach error: %s", e)
+    @wraps(orig_send_cached_media)
+    async def patched_send_cached_media(self, chat_id, file_id, *args, **kwargs):
+        if COVER_ENABLED:
+            try:
+                from database.ia_filterdb import get_file_details
+                details = await get_file_details(file_id)
+                if details:
+                    file_info = details[0]
+                    file_name = getattr(file_info, "file_name", "")
+                    file_type = getattr(file_info, "file_type", "document")
+                    caption = kwargs.get("caption") or getattr(file_info, "caption", "") or file_name
+                    thumb = await _get_poster_thumb(file_name or caption)
+                    if thumb:
+                        kwargs["thumb"] = thumb
+                        if file_type == "video":
+                            return await orig_send_video(self, chat_id, file_id, *args, **kwargs)
+                        elif file_type == "audio":
+                            return await orig_send_audio(self, chat_id, file_id, *args, **kwargs)
+                        else:
+                            return await orig_send_document(self, chat_id, file_id, *args, **kwargs)
+            except Exception as e:
+                log.debug("Fallback send_cached_media due to error: %s", e)
 
-        return await original(media, *args, **kwargs)
+        return await orig_send_cached_media(self, chat_id, file_id, *args, **kwargs)
 
-    patched_save_file._cover_patched = True
-    ia_filterdb.save_file = patched_save_file
-    log.info("✅ Patched save_file [cover attach]")
+    patched_send_video._cover_patched = True
+    patched_send_document._cover_patched = True
+    patched_send_audio._cover_patched = True
+    patched_send_cached_media._cover_patched = True
+
+    Client.send_video = patched_send_video
+    Client.send_document = patched_send_document
+    Client.send_audio = patched_send_audio
+    Client.send_cached_media = patched_send_cached_media
     return True
 
 
@@ -346,7 +341,7 @@ def apply_all():
         return
     _PATCHED = True
     _patch_media_client()
-    _patch_save_file()
+    _patch_client_media_send()
     log.info("Cover patches applied [enabled=%s]", COVER_ENABLED)
 
 
