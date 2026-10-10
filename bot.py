@@ -1,3 +1,4 @@
+import monkey_patch  # noqa: F401
 import plugins.listener  # noqa: F401
 import logging
 import logging.config
